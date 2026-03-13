@@ -8,24 +8,31 @@ import {
   Delete02Icon,
   Edit02Icon,
   Globe02Icon,
+  Link01Icon,
   LinkSquare01Icon,
   Mail01Icon,
   MoreHorizontalIcon,
   Note01Icon,
+  RepeatIcon,
   SentIcon,
   Task01Icon,
   UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { format, formatDistanceToNow, isPast } from "date-fns";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { DateTimePicker } from "@/components/date-time-picker";
 import { EmailComposeDialog } from "@/components/email-compose-dialog";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge, StatusDot } from "@/components/status-badge";
 import { TaskCheckbox } from "@/components/task-checkbox";
+import {
+  RecurrenceBadge,
+  TaskTypeBadge,
+  TaskTypePicker,
+} from "@/components/task-type-picker";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,7 +55,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -58,9 +64,8 @@ import {
   SOURCE_LABELS,
   STATUS_LABELS,
   TASK_RECURRENCES,
-  TASK_TYPE_LABELS,
-  TASK_TYPES,
 } from "@/lib/constants";
+import dayjs from "@/lib/dayjs";
 import {
   useAddNote,
   useAssignLead,
@@ -69,18 +74,15 @@ import {
   useDeleteLead,
   useDeleteTask,
   useEmailTemplates,
+  useGoogleConnection,
   useLead,
+  useLeadEmails,
   useLogOutreach,
   useRescheduleTask,
   useTeamMembers,
   useToggleTask,
 } from "@/lib/queries";
-import {
-  defaultDueDate,
-  formatCents,
-  formatWebsite,
-  getInitials,
-} from "@/lib/utils";
+import { formatCents, formatWebsite, getInitials } from "@/lib/utils";
 
 interface TeamMember {
   email: string;
@@ -113,17 +115,22 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
   const rescheduleTask = useRescheduleTask();
   const assignLead = useAssignLead();
   const { data: teamMembers = [] as TeamMember[] } = useTeamMembers();
+  const { data: gConn } = useGoogleConnection();
+  const { data: leadEmails = [] } = useLeadEmails(lead?.email ?? null);
 
   const [showEdit, setShowEdit] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
+  const [leftTab, setLeftTab] = useState<"activity" | "emails">("activity");
   const [noteText, setNoteText] = useState("");
   const [showAddTask, setShowAddTask] = useState(false);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newTaskDue, setNewTaskDue] = useState(defaultDueDate);
+  const [newTaskDue, setNewTaskDue] = useState<Date | null>(null);
   const [newTaskType, setNewTaskType] = useState("follow_up");
   const [newTaskAssignee, setNewTaskAssignee] = useState<string>("_self");
   const [newTaskRecurrence, setNewTaskRecurrence] = useState<string>("none");
+  const [newTaskMeetingLink, setNewTaskMeetingLink] = useState("");
+  const [newTaskSyncCalendar, setNewTaskSyncCalendar] = useState(true);
 
   if (isLoading) {
     return null;
@@ -178,16 +185,21 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
     createTask.mutate({
       leadId: id,
       title: newTaskTitle,
-      dueAt: new Date(newTaskDue),
+      dueAt: newTaskDue,
       type: newTaskType,
       userId: newTaskAssignee === "_self" ? undefined : newTaskAssignee,
       recurrence: newTaskRecurrence === "none" ? null : newTaskRecurrence,
+      meetingLink: newTaskMeetingLink.trim() || null,
+      syncToCalendar:
+        newTaskSyncCalendar &&
+        (newTaskType === "meeting" || newTaskType === "demo"),
     });
     setNewTaskTitle("");
-    setNewTaskDue(defaultDueDate());
+    setNewTaskDue(null);
     setNewTaskType("follow_up");
     setNewTaskAssignee("_self");
     setNewTaskRecurrence("none");
+    setNewTaskMeetingLink("");
     setShowAddTask(false);
   }
 
@@ -348,51 +360,112 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
             </div>
           </div>
 
-          {/* Scrollable activity */}
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-            <h3 className="mb-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+          {/* Tab switcher */}
+          <div className="flex shrink-0 items-center gap-1 border-b px-6">
+            <button
+              className={`border-b-2 px-3 py-2 text-xs transition-colors ${
+                leftTab === "activity"
+                  ? "border-primary font-medium text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setLeftTab("activity")}
+              type="button"
+            >
               Activity ({lead.activities.length})
-            </h3>
-            {lead.activities.length === 0 && (
-              <p className="py-8 text-center text-muted-foreground text-xs">
-                No activity yet
-              </p>
+            </button>
+            {gConn?.hasGmail && (
+              <button
+                className={`border-b-2 px-3 py-2 text-xs transition-colors ${
+                  leftTab === "emails"
+                    ? "border-primary font-medium text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => setLeftTab("emails")}
+                type="button"
+              >
+                Emails ({leadEmails.length})
+              </button>
             )}
-            <div className="space-y-0">
-              {lead.activities.map((a, i) => {
-                const Icon = ACTIVITY_ICONS[a.type] ?? Note01Icon;
-                const isLast = i === lead.activities.length - 1;
-                return (
-                  <div
-                    className={`relative flex gap-3 pb-4 pl-6 ${isLast ? "" : "border-muted-foreground/20 border-l"}`}
-                    key={a.id}
-                    style={{ marginLeft: "11px" }}
-                  >
-                    <div className="absolute top-0 -left-[12px] flex size-6 items-center justify-center rounded-full border bg-background">
-                      <HugeiconsIcon
-                        className="text-muted-foreground"
-                        icon={Icon}
-                        size={12}
-                        strokeWidth={1.5}
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1 pt-0.5">
-                      <p className="text-sm">{a.content}</p>
-                      <p className="mt-0.5 text-muted-foreground text-xs">
-                        {a.user?.name ?? "System"} ·{" "}
-                        {formatDistanceToNow(new Date(a.createdAt), {
-                          addSuffix: true,
-                        })}
+          </div>
+
+          {/* Scrollable content */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            {leftTab === "activity" && (
+              <>
+                {lead.activities.length === 0 && (
+                  <p className="py-8 text-center text-muted-foreground text-xs">
+                    No activity yet
+                  </p>
+                )}
+                <div className="space-y-0">
+                  {lead.activities.map((a, i) => {
+                    const Icon = ACTIVITY_ICONS[a.type] ?? Note01Icon;
+                    const isLast = i === lead.activities.length - 1;
+                    return (
+                      <div
+                        className={`relative flex gap-3 pb-4 pl-6 ${isLast ? "" : "border-muted-foreground/20 border-l"}`}
+                        key={a.id}
+                        style={{ marginLeft: "11px" }}
+                      >
+                        <div className="absolute top-0 -left-[12px] flex size-6 items-center justify-center rounded-full border bg-background">
+                          <HugeiconsIcon
+                            className="text-muted-foreground"
+                            icon={Icon}
+                            size={12}
+                            strokeWidth={1.5}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1 pt-0.5">
+                          <p className="text-sm">{a.content}</p>
+                          <p className="mt-0.5 text-muted-foreground text-xs">
+                            {a.user?.name ?? "System"} ·{" "}
+                            {dayjs(a.createdAt).fromNow()}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {leftTab === "emails" && (
+              <>
+                {leadEmails.length === 0 && (
+                  <p className="py-8 text-center text-muted-foreground text-xs">
+                    No emails found
+                  </p>
+                )}
+                <div className="space-y-2">
+                  {leadEmails.map((email) => (
+                    <div className="rounded-md border p-3" key={email.id}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium text-sm">
+                            {email.subject || "(no subject)"}
+                          </p>
+                          <p className="mt-0.5 truncate text-muted-foreground text-xs">
+                            {email.from}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-[10px] text-muted-foreground">
+                          {dayjs(Number(email.internalDate)).format(
+                            "MMM D, h:mm A"
+                          )}
+                        </span>
+                      </div>
+                      <p className="mt-2 line-clamp-3 text-muted-foreground text-xs">
+                        {email.snippet}
                       </p>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* RIGHT — Details + Owner + Tasks sidebar */}
+        {/* RIGHT — Details + Assigned To + Tasks sidebar */}
         <div className="flex w-80 shrink-0 flex-col lg:w-96">
           {/* Details section */}
           <div className="shrink-0 border-b px-5 py-4">
@@ -450,16 +523,16 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                   Added
                 </span>
                 <span className="text-muted-foreground">
-                  {format(new Date(lead.createdAt), "MMM d, yyyy")}
+                  {dayjs(lead.createdAt).format("MMM D, YYYY")}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Owner section */}
+          {/* Assigned To section */}
           <div className="shrink-0 border-b px-5 py-4">
             <h3 className="mb-2.5 font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
-              Owner
+              Assigned To
             </h3>
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -551,7 +624,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                 onClick={() => {
                   setShowAddTask(!showAddTask);
                   if (!showAddTask) {
-                    setNewTaskDue(defaultDueDate());
+                    setNewTaskDue(null);
                   }
                 }}
                 size="icon-sm"
@@ -576,26 +649,12 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                   value={newTaskTitle}
                 />
                 <div className="grid grid-cols-2 gap-2">
-                  <Select
-                    onValueChange={(v) => v && setNewTaskType(v)}
+                  <TaskTypePicker
+                    className="w-full"
+                    onChange={setNewTaskType}
                     value={newTaskType}
-                  >
-                    <SelectTrigger className="w-full text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TASK_TYPES.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {TASK_TYPE_LABELS[t] ?? t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    onChange={(e) => setNewTaskDue(e.target.value)}
-                    type="datetime-local"
-                    value={newTaskDue}
                   />
+                  <DateTimePicker onChange={setNewTaskDue} value={newTaskDue} />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Select
@@ -603,7 +662,19 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                     value={newTaskAssignee}
                   >
                     <SelectTrigger className="w-full text-xs">
-                      <SelectValue />
+                      <HugeiconsIcon
+                        className="mr-1 shrink-0 text-muted-foreground"
+                        icon={UserIcon}
+                        size={12}
+                        strokeWidth={1.5}
+                      />
+                      <span className="flex-1 truncate text-left">
+                        {newTaskAssignee === "_self"
+                          ? "Myself"
+                          : ((teamMembers as TeamMember[]).find(
+                              (m) => m.id === newTaskAssignee
+                            )?.name ?? "Select...")}
+                      </span>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_self">Myself</SelectItem>
@@ -619,7 +690,18 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                     value={newTaskRecurrence}
                   >
                     <SelectTrigger className="w-full text-xs">
-                      <SelectValue />
+                      <HugeiconsIcon
+                        className="mr-1 shrink-0 text-muted-foreground"
+                        icon={RepeatIcon}
+                        size={12}
+                        strokeWidth={1.5}
+                      />
+                      <span className="flex-1 truncate text-left">
+                        {newTaskRecurrence === "none"
+                          ? "One-time"
+                          : (RECURRENCE_LABELS[newTaskRecurrence] ??
+                            newTaskRecurrence)}
+                      </span>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">One-time</SelectItem>
@@ -631,9 +713,40 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex justify-end">
+                {(newTaskType === "meeting" || newTaskType === "demo") && (
+                  <>
+                    <Input
+                      onChange={(e) => setNewTaskMeetingLink(e.target.value)}
+                      placeholder="Meeting link (or leave empty to auto-generate Meet)"
+                      value={newTaskMeetingLink}
+                    />
+                    <label className="flex items-center gap-2 text-muted-foreground text-xs">
+                      <input
+                        checked={newTaskSyncCalendar}
+                        className="rounded border"
+                        onChange={(e) =>
+                          setNewTaskSyncCalendar(e.target.checked)
+                        }
+                        type="checkbox"
+                      />
+                      Create Google Calendar event with Meet link
+                    </label>
+                  </>
+                )}
+                <div className="flex justify-end gap-2">
                   <Button
-                    disabled={createTask.isPending}
+                    onClick={() => setShowAddTask(false)}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    disabled={
+                      createTask.isPending ||
+                      !newTaskTitle.trim() ||
+                      !newTaskDue
+                    }
                     onClick={handleAddTask}
                     size="sm"
                   >
@@ -760,6 +873,8 @@ function TaskRow({
     dueAt: Date;
     completedAt: Date | null;
     type: string;
+    recurrence?: string | null;
+    meetingLink?: string | null;
   };
   leadId: string;
   onToggle: ReturnType<typeof useToggleTask>;
@@ -767,7 +882,7 @@ function TaskRow({
   onReschedule: ReturnType<typeof useRescheduleTask>;
 }) {
   const isComplete = !!t.completedAt;
-  const overdue = !isComplete && isPast(new Date(t.dueAt));
+  const overdue = !isComplete && dayjs(t.dueAt).isBefore(dayjs(), "minute");
 
   return (
     <div className="group flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/40">
@@ -781,14 +896,25 @@ function TaskRow({
         >
           {t.title}
         </p>
-        <div className="mt-0.5 flex items-center gap-1.5">
-          <span className="rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground uppercase">
-            {TASK_TYPE_LABELS[t.type] ?? t.type}
-          </span>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+          <TaskTypeBadge type={t.type} />
+          <RecurrenceBadge recurrence={t.recurrence ?? null} />
+          {t.meetingLink && (
+            <a
+              className="inline-flex items-center gap-0.5 rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[9px] text-cyan-400 uppercase transition-colors hover:bg-cyan-500/25"
+              href={t.meetingLink}
+              onClick={(e) => e.stopPropagation()}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <HugeiconsIcon icon={Link01Icon} size={8} strokeWidth={2} />
+              Join
+            </a>
+          )}
           <span
             className={`text-[11px] ${overdue ? "text-red-400" : "text-muted-foreground"}`}
           >
-            {format(new Date(t.dueAt), "MMM d")}
+            {dayjs(t.dueAt).format("MMM D")} · {dayjs(t.dueAt).fromNow()}
             {overdue && " · overdue"}
           </span>
         </div>

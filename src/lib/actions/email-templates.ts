@@ -1,13 +1,14 @@
 "use server";
 
-import { addDays } from "date-fns";
 import { desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { activity, emailTemplate, lead, task } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import dayjs from "@/lib/dayjs";
 import { mergeTags, sendEmail } from "@/lib/email";
+import { sendGmailEmail } from "./gmail";
 
 async function getUser() {
   const session = await auth.api.getSession({
@@ -59,7 +60,12 @@ export async function deleteEmailTemplate(id: string) {
 
 export async function sendLeadEmail(
   leadId: string,
-  data: { subject: string; body: string; templateId?: string }
+  data: {
+    subject: string;
+    body: string;
+    templateId?: string;
+    sendVia?: "resend" | "gmail";
+  }
 ) {
   const user = await getUser();
 
@@ -78,7 +84,22 @@ export async function sendLeadEmail(
   const subject = mergeTags(data.subject, mergeData);
   const body = mergeTags(data.body, mergeData);
 
-  await sendEmail({ to: row.email, subject, body });
+  let gmailMeta: { gmailMessageId?: string; gmailThreadId?: string } = {};
+
+  if (data.sendVia === "gmail") {
+    const result = await sendGmailEmail({
+      leadId,
+      to: row.email,
+      subject,
+      body,
+    });
+    gmailMeta = {
+      gmailMessageId: result.messageId,
+      gmailThreadId: result.threadId,
+    };
+  } else {
+    await sendEmail({ to: row.email, subject, body });
+  }
 
   await db.insert(activity).values({
     leadId,
@@ -88,6 +109,8 @@ export async function sendLeadEmail(
     metadata: {
       subject,
       templateId: data.templateId,
+      sendVia: data.sendVia ?? "resend",
+      ...gmailMeta,
     },
   });
 
@@ -110,7 +133,7 @@ export async function sendLeadEmail(
       userId: user.id,
       title: `Follow up with ${row.name}`,
       type: "follow_up",
-      dueAt: addDays(new Date(), 3),
+      dueAt: dayjs().add(3, "day").toDate(),
     });
   } else if (row.status === "contacted") {
     const existingTasks = await db.query.task.findMany({
@@ -122,7 +145,7 @@ export async function sendLeadEmail(
     if (openFollowUp) {
       await db
         .update(task)
-        .set({ dueAt: addDays(new Date(), 3) })
+        .set({ dueAt: dayjs().add(3, "day").toDate() })
         .where(eq(task.id, openFollowUp.id));
     }
   }

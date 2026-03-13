@@ -35,6 +35,9 @@ import {
 } from "@/lib/actions/tasks";
 import { getTeamMembers } from "@/lib/actions/team";
 import { RESCHEDULE_LABELS, STATUS_LABELS } from "@/lib/constants";
+import { getUpcomingCalendarEvents } from "./actions/calendar";
+import { getLeadEmails } from "./actions/gmail";
+import { checkGoogleConnection } from "./google";
 
 // ---------------------------------------------------------------------------
 // Query keys
@@ -48,6 +51,9 @@ export const queryKeys = {
   dashboard: ["dashboard"] as const,
   emailTemplates: ["email-templates"] as const,
   team: ["team"] as const,
+  calendarEvents: ["calendar-events"] as const,
+  leadEmails: (email: string) => ["lead-emails", email] as const,
+  googleConnection: ["google-connection"] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -118,6 +124,31 @@ export function useTeamMembers() {
     queryKey: queryKeys.team,
     queryFn: () => getTeamMembers(),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useGoogleConnection() {
+  return useQuery({
+    queryKey: queryKeys.googleConnection,
+    queryFn: () => checkGoogleConnection(),
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useCalendarEvents(opts?: { maxResults?: number }) {
+  return useQuery({
+    queryKey: queryKeys.calendarEvents,
+    queryFn: () => getUpcomingCalendarEvents(opts),
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useLeadEmails(email: string | null) {
+  return useQuery({
+    queryKey: queryKeys.leadEmails(email ?? ""),
+    queryFn: () => getLeadEmails(email ?? ""),
+    enabled: !!email,
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -296,6 +327,7 @@ export function useLogOutreach() {
 }
 
 export function useSendEmail() {
+  const qc = useQueryClient();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: ({
@@ -303,11 +335,19 @@ export function useSendEmail() {
       data,
     }: {
       leadId: string;
-      data: { subject: string; body: string; templateId?: string };
+      data: {
+        subject: string;
+        body: string;
+        templateId?: string;
+        sendVia?: "resend" | "gmail";
+      };
     }) => sendLeadEmail(leadId, data),
-    onSuccess: (_, { leadId }) => {
+    onSuccess: (_, { leadId, data }) => {
       inv.lead(leadId);
-      toast.success("Email sent");
+      if (data.sendVia === "gmail") {
+        qc.invalidateQueries({ queryKey: ["lead-emails"] });
+      }
+      toast.success(data.sendVia === "gmail" ? "Sent via Gmail" : "Email sent");
     },
     onError: () => toast.error("Failed to send email"),
   });
@@ -330,6 +370,7 @@ export function useCreateTask() {
 }
 
 export function useToggleTask() {
+  const qc = useQueryClient();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: ({
@@ -340,11 +381,45 @@ export function useToggleTask() {
       isComplete: boolean;
       leadId?: string | null;
     }) => (isComplete ? uncompleteTask(id) : completeTask(id)),
+    onMutate: async ({ id, isComplete }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.tasks });
+      await qc.cancelQueries({ queryKey: queryKeys.dashboard });
+
+      const snapshots = qc.getQueriesData({ queryKey: queryKeys.tasks });
+      qc.setQueriesData(
+        { queryKey: queryKeys.tasks },
+        (old: Array<{ id: string; completedAt: Date | null }> | undefined) => {
+          if (!old) {
+            return old;
+          }
+          return old.map((t) =>
+            t.id === id
+              ? { ...t, completedAt: isComplete ? null : new Date() }
+              : t
+          );
+        }
+      );
+
+      const dashSnap = qc.getQueriesData({ queryKey: queryKeys.dashboard });
+      return { snapshots, dashSnap };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.snapshots) {
+        for (const [key, data] of ctx.snapshots) {
+          qc.setQueryData(key, data);
+        }
+      }
+      if (ctx?.dashSnap) {
+        for (const [key, data] of ctx.dashSnap) {
+          qc.setQueryData(key, data);
+        }
+      }
+      toast.error("Failed to update task");
+    },
     onSuccess: (_, { isComplete, leadId }) => {
       inv.tasks(leadId);
       toast.success(isComplete ? "Task reopened" : "Task completed");
     },
-    onError: () => toast.error("Failed to update task"),
   });
 }
 

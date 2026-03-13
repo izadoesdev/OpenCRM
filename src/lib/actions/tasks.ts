@@ -1,12 +1,13 @@
 "use server";
 
-import { addDays, addMonths, addWeeks } from "date-fns";
 import { and, asc, eq, isNull, lte, type SQL } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { db } from "@/db";
-import { task } from "@/db/schema";
+import { lead, task } from "@/db/schema";
+import { createCalendarEvent } from "@/lib/actions/calendar";
 import { auth } from "@/lib/auth";
+import dayjs from "@/lib/dayjs";
 
 async function getUser() {
   const session = await auth.api.getSession({
@@ -27,17 +28,18 @@ function revalidateAll(leadId?: string | null) {
 }
 
 function nextDueDate(current: Date, recurrence: string): Date {
+  const d = dayjs(current);
   switch (recurrence) {
     case "daily":
-      return addDays(current, 1);
+      return d.add(1, "day").toDate();
     case "weekly":
-      return addWeeks(current, 1);
+      return d.add(1, "week").toDate();
     case "biweekly":
-      return addWeeks(current, 2);
+      return d.add(2, "week").toDate();
     case "monthly":
-      return addMonths(current, 1);
+      return d.add(1, "month").toDate();
     default:
-      return addDays(current, 1);
+      return d.add(1, "day").toDate();
   }
 }
 
@@ -79,8 +81,40 @@ export async function createTask(data: {
   type?: string;
   userId?: string;
   recurrence?: string | null;
+  meetingLink?: string | null;
+  syncToCalendar?: boolean;
 }) {
   const currentUser = await getUser();
+
+  let calendarEventId: string | null = null;
+  let meetingLink = data.meetingLink ?? null;
+
+  if (
+    data.syncToCalendar &&
+    (data.type === "meeting" || data.type === "demo")
+  ) {
+    try {
+      const leadRow = await db.query.lead.findFirst({
+        where: eq(lead.id, data.leadId),
+      });
+
+      const calResult = await createCalendarEvent({
+        summary: data.title,
+        description: data.description,
+        startTime: data.dueAt,
+        attendeeEmails: leadRow?.email ? [leadRow.email] : undefined,
+        addMeetLink: true,
+      });
+
+      calendarEventId = calResult.eventId;
+      if (calResult.meetLink) {
+        meetingLink = calResult.meetLink;
+      }
+    } catch {
+      // Calendar sync failed silently — task still gets created
+    }
+  }
+
   const [row] = await db
     .insert(task)
     .values({
@@ -91,6 +125,8 @@ export async function createTask(data: {
       userId: data.userId ?? currentUser.id,
       type: data.type ?? "follow_up",
       recurrence: data.recurrence ?? null,
+      meetingLink,
+      calendarEventId,
     })
     .returning();
 
@@ -107,6 +143,7 @@ export async function updateTask(
     type: string;
     userId: string | null;
     recurrence: string | null;
+    meetingLink: string | null;
   }>
 ) {
   await getUser();
@@ -144,6 +181,7 @@ export async function completeTask(id: string) {
       description: existing.description,
       type: existing.type,
       recurrence: existing.recurrence,
+      meetingLink: existing.meetingLink,
       dueAt: nextDueDate(base, existing.recurrence),
     });
   }
@@ -176,7 +214,7 @@ export async function rescheduleTask(id: string, days: number) {
   const baseDate = existing.dueAt < new Date() ? new Date() : existing.dueAt;
   const [row] = await db
     .update(task)
-    .set({ dueAt: addDays(baseDate, days) })
+    .set({ dueAt: dayjs(baseDate).add(days, "day").toDate() })
     .where(eq(task.id, id))
     .returning();
 

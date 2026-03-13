@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
-import { addDays, format } from "date-fns";
 import { twMerge } from "tailwind-merge";
+import dayjs from "@/lib/dayjs";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -33,5 +33,5 @@ export function formatWebsite(url: string): string {
 }
 
 export function defaultDueDate(): string {
-  return format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm");
+  return dayjs().add(1, "day").format("YYYY-MM-DDTHH:mm");
 }

@@ -5,17 +5,21 @@ import {
   Delete02Icon,
   Edit02Icon,
   MoreHorizontalIcon,
-  RepeatIcon,
   Task01Icon,
   UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { format, isPast, isToday, isTomorrow } from "date-fns";
 import Link from "next/link";
 import { useState } from "react";
+import { DateTimePicker } from "@/components/date-time-picker";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { TaskCheckbox } from "@/components/task-checkbox";
+import {
+  RecurrenceBadge,
+  TaskTypeBadge,
+  TaskTypePicker,
+} from "@/components/task-type-picker";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,14 +42,10 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { useSession } from "@/lib/auth-client";
-import {
-  RECURRENCE_LABELS,
-  TASK_TYPE_LABELS,
-  TASK_TYPES,
-} from "@/lib/constants";
+import { TASK_TYPE_LABELS, TASK_TYPES } from "@/lib/constants";
+import dayjs from "@/lib/dayjs";
 import {
   useDeleteTask,
   useRescheduleTask,
@@ -69,6 +69,7 @@ interface TaskWithLead {
   id: string;
   lead: { id: string; name: string; status: string } | null;
   leadId: string;
+  meetingLink: string | null;
   recurrence: string | null;
   title: string;
   type: string;
@@ -103,26 +104,28 @@ function getDueLabel(
   if (completed) {
     return { text: "Done", className: "text-muted-foreground" };
   }
-  if (isPast(dueAt)) {
+  const d = dayjs(dueAt);
+  const rel = d.fromNow();
+  if (d.isToday()) {
     return {
-      text: `Overdue · ${format(dueAt, "MMM d")}`,
-      className: "text-red-400",
-    };
-  }
-  if (isToday(dueAt)) {
-    return {
-      text: `Today · ${format(dueAt, "h:mm a")}`,
+      text: `Today · ${d.format("h:mm A")} · ${rel}`,
       className: "text-amber-400",
     };
   }
-  if (isTomorrow(dueAt)) {
+  if (d.isBefore(dayjs(), "minute")) {
     return {
-      text: `Tomorrow · ${format(dueAt, "h:mm a")}`,
+      text: `Overdue · ${d.format("MMM D")} · ${rel}`,
+      className: "text-red-400",
+    };
+  }
+  if (d.isTomorrow()) {
+    return {
+      text: `Tomorrow · ${d.format("h:mm A")} · ${rel}`,
       className: "text-blue-400",
     };
   }
   return {
-    text: format(dueAt, "MMM d · h:mm a"),
+    text: `${d.format("MMM D · h:mm A")} · ${rel}`,
     className: "text-muted-foreground",
   };
 }
@@ -162,7 +165,7 @@ export function TasksPageClient() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [editingTask, setEditingTask] = useState<TaskWithLead | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [editDue, setEditDue] = useState("");
+  const [editDue, setEditDue] = useState<Date | null>(null);
   const [editType, setEditType] = useState("follow_up");
 
   let tasks = allTasks as TaskWithLead[];
@@ -174,17 +177,15 @@ export function TasksPageClient() {
   }
 
   const overdue = tasks.filter(
-    (t) => !t.completedAt && isPast(new Date(t.dueAt))
+    (t) => !t.completedAt && dayjs(t.dueAt).isBefore(dayjs(), "minute")
   );
-  const today = tasks.filter(
-    (t) => !t.completedAt && isToday(new Date(t.dueAt))
-  );
+  const today = tasks.filter((t) => !t.completedAt && dayjs(t.dueAt).isToday());
   const upcoming = tasks.filter(
     (t) =>
       !(
         t.completedAt ||
-        isPast(new Date(t.dueAt)) ||
-        isToday(new Date(t.dueAt))
+        dayjs(t.dueAt).isBefore(dayjs(), "minute") ||
+        dayjs(t.dueAt).isToday()
       )
   );
   const completed = tasks.filter((t) => !!t.completedAt);
@@ -192,17 +193,17 @@ export function TasksPageClient() {
   function openEdit(task: TaskWithLead) {
     setEditingTask(task);
     setEditTitle(task.title);
-    setEditDue(format(new Date(task.dueAt), "yyyy-MM-dd'T'HH:mm"));
+    setEditDue(new Date(task.dueAt));
     setEditType(task.type);
   }
 
   function handleSaveEdit() {
-    if (!(editingTask && editTitle.trim())) {
+    if (!(editingTask && editTitle.trim() && editDue)) {
       return;
     }
     updateTaskMut.mutate({
       id: editingTask.id,
-      data: { title: editTitle, dueAt: new Date(editDue), type: editType },
+      data: { title: editTitle, dueAt: editDue, type: editType },
       leadId: editingTask.leadId,
     });
     setEditingTask(null);
@@ -212,7 +213,7 @@ export function TasksPageClient() {
     (t) => !t.completedAt
   ).length;
   const overdueCount = (allTasks as TaskWithLead[]).filter(
-    (t) => !t.completedAt && isPast(new Date(t.dueAt))
+    (t) => !t.completedAt && dayjs(t.dueAt).isBefore(dayjs(), "minute")
   ).length;
 
   if (isLoading) {
@@ -272,18 +273,18 @@ export function TasksPageClient() {
                       </Link>
                     )}
                     {t.lead && <StatusBadge status={t.lead.status} />}
-                    <span className="rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground uppercase">
-                      {TASK_TYPE_LABELS[t.type] ?? t.type}
-                    </span>
-                    {t.recurrence && (
-                      <span className="flex items-center gap-0.5 rounded bg-violet-500/15 px-1 py-0.5 text-[9px] text-violet-400 uppercase">
-                        <HugeiconsIcon
-                          icon={RepeatIcon}
-                          size={8}
-                          strokeWidth={2}
-                        />
-                        {RECURRENCE_LABELS[t.recurrence] ?? t.recurrence}
-                      </span>
+                    <TaskTypeBadge type={t.type} />
+                    <RecurrenceBadge recurrence={t.recurrence} />
+                    {t.meetingLink && (
+                      <a
+                        className="inline-flex items-center gap-0.5 rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[9px] text-cyan-400 uppercase transition-colors hover:bg-cyan-500/25"
+                        href={t.meetingLink}
+                        onClick={(e) => e.stopPropagation()}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                      >
+                        Join
+                      </a>
                     )}
                     <span className={`text-xs ${due.className}`}>
                       {due.text}
@@ -481,7 +482,17 @@ export function TasksPageClient() {
                     size={12}
                     strokeWidth={1.5}
                   />
-                  <SelectValue />
+                  <span className="flex-1 truncate text-left">
+                    {userFilter === "all"
+                      ? "Everyone"
+                      : ((
+                          teamMembers as Array<{
+                            id: string;
+                            name: string;
+                          }>
+                        ).find((m) => m.id === userFilter)?.name ??
+                        "Select...")}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Everyone</SelectItem>
@@ -505,7 +516,10 @@ export function TasksPageClient() {
               value={typeFilter}
             >
               <SelectTrigger className="h-8 w-[120px] text-xs">
-                <SelectValue />
+                <span className="flex-1 truncate text-left">
+                  {TYPE_FILTERS.find((f) => f.value === typeFilter)?.label ??
+                    "All types"}
+                </span>
               </SelectTrigger>
               <SelectContent>
                 {TYPE_FILTERS.map((f) => (
@@ -576,23 +590,12 @@ export function TasksPageClient() {
               placeholder="Task title"
               value={editTitle}
             />
-            <Select onValueChange={(v) => v && setEditType(v)} value={editType}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TASK_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {TASK_TYPE_LABELS[t] ?? t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
-              onChange={(e) => setEditDue(e.target.value)}
-              type="datetime-local"
-              value={editDue}
+            <TaskTypePicker
+              className="w-full"
+              onChange={setEditType}
+              value={editType}
             />
+            <DateTimePicker onChange={setEditDue} value={editDue} />
           </div>
           <DialogFooter>
             <Button onClick={handleSaveEdit} size="sm">

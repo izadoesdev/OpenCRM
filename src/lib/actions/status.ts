@@ -1,12 +1,12 @@
 "use server";
 
-import { addDays } from "date-fns";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { activity, lead, task } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import dayjs from "@/lib/dayjs";
 
 async function getUser() {
   const session = await auth.api.getSession({
@@ -68,7 +68,7 @@ export async function changeLeadStatus(
       userId: user.id,
       title: `Follow up with ${existing.name}`,
       type: "follow_up",
-      dueAt: addDays(new Date(), 3),
+      dueAt: dayjs().add(3, "day").toDate(),
     });
   }
 
@@ -78,7 +78,7 @@ export async function changeLeadStatus(
       userId: user.id,
       title: `Prepare demo for ${existing.name}`,
       type: "demo",
-      dueAt: addDays(new Date(), 1),
+      dueAt: dayjs().add(1, "day").toDate(),
     });
   }
 
@@ -88,7 +88,7 @@ export async function changeLeadStatus(
       userId: user.id,
       title: `Onboarding check-in with ${existing.name}`,
       type: "follow_up",
-      dueAt: addDays(new Date(), 7),
+      dueAt: dayjs().add(7, "day").toDate(),
     });
   }
 

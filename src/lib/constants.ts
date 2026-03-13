@@ -28,9 +28,11 @@ export type LeadPlan = (typeof LEAD_PLANS)[number];
 
 export const TASK_TYPES = [
   "follow_up",
-  "demo",
   "call",
   "email",
+  "meeting",
+  "demo",
+  "linkedin",
   "other",
 ] as const;
 
@@ -67,10 +69,22 @@ export const SOURCE_LABELS: Record<string, string> = {
 
 export const TASK_TYPE_LABELS: Record<string, string> = {
   follow_up: "Follow-up",
-  demo: "Demo",
   call: "Call",
-  email: "Email",
+  email: "Send Email",
+  meeting: "Meeting",
+  demo: "Demo",
+  linkedin: "LinkedIn",
   other: "Other",
+};
+
+export const TASK_TYPE_COLORS: Record<string, string> = {
+  follow_up: "bg-blue-500/15 text-blue-400",
+  call: "bg-amber-500/15 text-amber-400",
+  email: "bg-emerald-500/15 text-emerald-400",
+  meeting: "bg-violet-500/15 text-violet-400",
+  demo: "bg-cyan-500/15 text-cyan-400",
+  linkedin: "bg-sky-500/15 text-sky-400",
+  other: "bg-zinc-500/15 text-zinc-400",
 };
 
 export const RESCHEDULE_LABELS: Record<number, string> = {

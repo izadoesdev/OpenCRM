@@ -6,22 +6,25 @@ import {
   Calendar01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { format, isPast, isToday } from "date-fns";
 import Link from "next/link";
 import { useState } from "react";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { TaskCheckbox } from "@/components/task-checkbox";
+import { RecurrenceBadge, TaskTypeBadge } from "@/components/task-type-picker";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import type { CalendarEvent } from "@/lib/actions/calendar";
+import { LEAD_STATUSES, STATUS_COLORS, STATUS_LABELS } from "@/lib/constants";
+import dayjs from "@/lib/dayjs";
 import {
-  LEAD_STATUSES,
-  STATUS_COLORS,
-  STATUS_LABELS,
-  TASK_TYPE_LABELS,
-} from "@/lib/constants";
-import { useDashboard, useRescheduleTask, useToggleTask } from "@/lib/queries";
+  useCalendarEvents,
+  useDashboard,
+  useGoogleConnection,
+  useRescheduleTask,
+  useToggleTask,
+} from "@/lib/queries";
 import { formatCents, getInitials } from "@/lib/utils";
 
 const ACTIVE_STATUSES = LEAD_STATUSES.filter(
@@ -32,6 +35,10 @@ export function DashboardClient() {
   const { data, isLoading } = useDashboard();
   const toggleTask = useToggleTask();
   const rescheduleTask = useRescheduleTask();
+  const { data: gConn } = useGoogleConnection();
+  const { data: calEvents = [] as CalendarEvent[] } = useCalendarEvents({
+    maxResults: 5,
+  });
   const [showForm, setShowForm] = useState(false);
 
   if (isLoading || !data) {
@@ -52,17 +59,19 @@ export function DashboardClient() {
 
   const overdueTasks = allTasks.filter(
     (t) =>
-      !t.completedAt && isPast(new Date(t.dueAt)) && !isToday(new Date(t.dueAt))
+      !t.completedAt &&
+      dayjs(t.dueAt).isBefore(dayjs(), "minute") &&
+      !dayjs(t.dueAt).isToday()
   );
   const todayTasks = allTasks.filter(
-    (t) => !t.completedAt && isToday(new Date(t.dueAt))
+    (t) => !t.completedAt && dayjs(t.dueAt).isToday()
   );
   const laterTasks = allTasks.filter(
     (t) =>
       !(
         t.completedAt ||
-        isPast(new Date(t.dueAt)) ||
-        isToday(new Date(t.dueAt))
+        dayjs(t.dueAt).isBefore(dayjs(), "minute") ||
+        dayjs(t.dueAt).isToday()
       )
   );
 
@@ -165,6 +174,48 @@ export function DashboardClient() {
                 tasks={laterTasks}
               />
             </div>
+
+            {gConn?.hasCalendar && calEvents.length > 0 && (
+              <div className="mt-6">
+                <div className="flex items-center gap-2">
+                  <HugeiconsIcon
+                    className="text-muted-foreground"
+                    icon={Calendar01Icon}
+                    size={14}
+                    strokeWidth={1.5}
+                  />
+                  <h2 className="font-medium text-sm">Upcoming Events</h2>
+                </div>
+                <div className="mt-2 space-y-1">
+                  {calEvents.map((ev) => (
+                    <a
+                      className="flex items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/40"
+                      href={ev.htmlLink}
+                      key={ev.id}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      <div className="flex shrink-0 flex-col items-end">
+                        <span className="font-mono text-[10px] text-muted-foreground">
+                          {dayjs(ev.start.dateTime).format("h:mm A")}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground/70">
+                          {dayjs(ev.start.dateTime).fromNow()}
+                        </span>
+                      </div>
+                      <span className="min-w-0 flex-1 truncate text-sm">
+                        {ev.summary}
+                      </span>
+                      {ev.hangoutLink && (
+                        <span className="shrink-0 rounded-sm bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-400">
+                          Meet
+                        </span>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right — Pipeline + Recent */}
@@ -300,6 +351,8 @@ interface TaskItem {
   id: string;
   lead: { id: string; name: string } | null;
   leadId: string;
+  meetingLink: string | null;
+  recurrence: string | null;
   title: string;
   type: string;
 }
@@ -350,7 +403,8 @@ function DashboardTaskRow({
   onToggle: ReturnType<typeof useToggleTask>;
   onReschedule: ReturnType<typeof useRescheduleTask>;
 }) {
-  const overdue = isPast(new Date(t.dueAt)) && !isToday(new Date(t.dueAt));
+  const overdue =
+    dayjs(t.dueAt).isBefore(dayjs(), "minute") && !dayjs(t.dueAt).isToday();
 
   return (
     <div className="group flex items-start gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/40">
@@ -372,13 +426,24 @@ function DashboardTaskRow({
               {t.lead.name}
             </Link>
           )}
-          <span className="rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground uppercase">
-            {TASK_TYPE_LABELS[t.type] ?? t.type}
-          </span>
+          <TaskTypeBadge type={t.type} />
+          <RecurrenceBadge recurrence={t.recurrence} />
+          {t.meetingLink && (
+            <a
+              className="inline-flex items-center gap-0.5 rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[9px] text-cyan-400 uppercase transition-colors hover:bg-cyan-500/25"
+              href={t.meetingLink}
+              onClick={(e) => e.stopPropagation()}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Join
+            </a>
+          )}
           <span
             className={`text-[11px] ${overdue ? "text-red-400" : "text-muted-foreground"}`}
           >
-            {format(new Date(t.dueAt), "MMM d, h:mm a")}
+            {dayjs(t.dueAt).format("MMM D, h:mm A")} ·{" "}
+            {dayjs(t.dueAt).fromNow()}
           </span>
         </div>
       </div>

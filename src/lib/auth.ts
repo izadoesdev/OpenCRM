@@ -19,7 +19,15 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      scope: ["openid", "email", "profile"],
+      accessType: "offline",
+      scope: [
+        "openid",
+        "email",
+        "profile",
+        "https://www.googleapis.com/auth/calendar.events",
+        "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/gmail.readonly",
+      ],
     },
   },
   databaseHooks: {
@@ -27,8 +35,8 @@ export const auth = betterAuth({
       create: {
         before: async (user) => {
           if (!user.email?.endsWith(`@${ALLOWED_DOMAIN}`)) {
-            throw new Error(
-              `Only @${ALLOWED_DOMAIN} email addresses are allowed.`
+            await Promise.reject(
+              new Error(`Only @${ALLOWED_DOMAIN} email addresses are allowed.`)
             );
           }
           return { data: user };

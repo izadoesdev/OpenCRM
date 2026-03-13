@@ -1,11 +1,11 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LEAD_STATUSES, STATUS_COLORS, STATUS_LABELS } from "@/lib/constants";
+import dayjs from "@/lib/dayjs";
 import { useChangeLeadStatus, useLeads } from "@/lib/queries";
 import { formatCents, getInitials } from "@/lib/utils";
 
@@ -130,9 +130,7 @@ export function PipelineClient() {
                       )}
                       <div className="mt-1.5 flex items-center justify-between">
                         <span className="text-[10px] text-muted-foreground">
-                          {formatDistanceToNow(new Date(lead.createdAt), {
-                            addSuffix: true,
-                          })}
+                          {dayjs(lead.createdAt).fromNow()}
                         </span>
                         {lead.assignedUser && (
                           <Avatar className="size-4">

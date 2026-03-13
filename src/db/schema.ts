@@ -9,7 +9,6 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 
-
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -160,6 +159,8 @@ export const task = pgTable(
     completedAt: timestamp("completed_at"),
     type: text("type").notNull().default("follow_up"),
     recurrence: text("recurrence"),
+    meetingLink: text("meeting_link"),
+    calendarEventId: text("calendar_event_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

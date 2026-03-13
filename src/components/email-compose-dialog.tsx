@@ -1,5 +1,7 @@
 "use client";
 
+import { Mail01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useSendEmail } from "@/lib/queries";
+import { useGoogleConnection, useSendEmail } from "@/lib/queries";
 
 interface Template {
   body: string;
@@ -42,17 +44,20 @@ export function EmailComposeDialog({
   templates: Template[];
 }) {
   const sendEmail = useSendEmail();
+  const { data: gConn } = useGoogleConnection();
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [templateId, setTemplateId] = useState("");
+  const [sendVia, setSendVia] = useState<"resend" | "gmail">("resend");
 
   useEffect(() => {
     if (open) {
       setSubject("");
       setBody("");
       setTemplateId("");
+      setSendVia(gConn?.hasGmail ? "gmail" : "resend");
     }
-  }, [open]);
+  }, [open, gConn?.hasGmail]);
 
   function handleTemplateSelect(id: string | null) {
     if (!id) {
@@ -72,7 +77,15 @@ export function EmailComposeDialog({
       return;
     }
     sendEmail.mutate(
-      { leadId, data: { subject, body, templateId: templateId || undefined } },
+      {
+        leadId,
+        data: {
+          subject,
+          body,
+          templateId: templateId || undefined,
+          sendVia,
+        },
+      },
       { onSuccess: () => onOpenChange(false) }
     );
   }
@@ -161,9 +174,43 @@ export function EmailComposeDialog({
             </p>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex items-center gap-2 sm:justify-between">
+            {gConn?.hasGmail && (
+              <div className="flex rounded-md border bg-muted/30 p-0.5">
+                <button
+                  className={`rounded-sm px-2.5 py-1 text-xs transition-all ${
+                    sendVia === "gmail"
+                      ? "bg-background font-medium shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  onClick={() => setSendVia("gmail")}
+                  type="button"
+                >
+                  <HugeiconsIcon
+                    className="mr-1 inline"
+                    icon={Mail01Icon}
+                    size={11}
+                    strokeWidth={1.5}
+                  />
+                  Gmail
+                </button>
+                <button
+                  className={`rounded-sm px-2.5 py-1 text-xs transition-all ${
+                    sendVia === "resend"
+                      ? "bg-background font-medium shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  onClick={() => setSendVia("resend")}
+                  type="button"
+                >
+                  Resend
+                </button>
+              </div>
+            )}
             <Button disabled={sendEmail.isPending} type="submit">
-              {sendEmail.isPending ? "Sending..." : "Send Email"}
+              {sendEmail.isPending && "Sending..."}
+              {!sendEmail.isPending && sendVia === "gmail" && "Send via Gmail"}
+              {!sendEmail.isPending && sendVia !== "gmail" && "Send Email"}
             </Button>
           </DialogFooter>
         </form>

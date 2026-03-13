@@ -8,7 +8,6 @@ import {
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
@@ -35,6 +34,7 @@ import {
 } from "@/components/ui/table";
 import type { LeadRow } from "@/lib/actions/leads";
 import { LEAD_STATUSES, SOURCE_LABELS, STATUS_LABELS } from "@/lib/constants";
+import dayjs from "@/lib/dayjs";
 import {
   useBulkDeleteLeads,
   useBulkUpdateStatus,
@@ -241,7 +241,7 @@ export function LeadsPageClient() {
                   />
                 </TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Owner</TableHead>
+                <TableHead>Assigned To</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead className="text-right">Value</TableHead>
@@ -328,9 +328,7 @@ export function LeadsPageClient() {
                     {formatCents(lead.value)}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
-                    {formatDistanceToNow(new Date(lead.createdAt), {
-                      addSuffix: true,
-                    })}
+                    {dayjs(lead.createdAt).fromNow()}
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
