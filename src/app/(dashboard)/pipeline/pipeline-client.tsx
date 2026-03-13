@@ -2,32 +2,16 @@
 
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { PageHeader } from "@/components/page-header";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import type { LeadRow } from "@/lib/actions/leads";
-import { changeLeadStatus } from "@/lib/actions/status";
 import { LEAD_STATUSES, STATUS_COLORS, STATUS_LABELS } from "@/lib/constants";
+import { useChangeLeadStatus, useLeads } from "@/lib/queries";
+import { formatCents, getInitials } from "@/lib/utils";
 
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-function formatValue(cents: number): string {
-  if (cents === 0) {
-    return "";
-  }
-  return `$${(cents / 100).toLocaleString()}`;
-}
-
-export function PipelineClient({ leads }: { leads: LeadRow[] }) {
-  const [, startTransition] = useTransition();
+export function PipelineClient() {
+  const { data: leads = [], isLoading } = useLeads();
+  const changeStatus = useChangeLeadStatus();
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
 
   const columns = LEAD_STATUSES.map((status) => ({
@@ -52,7 +36,7 @@ export function PipelineClient({ leads }: { leads: LeadRow[] }) {
       return;
     }
 
-    startTransition(() => changeLeadStatus(leadId, targetStatus));
+    changeStatus.mutate({ leadId, status: targetStatus });
   }
 
   function handleDragStart(e: React.DragEvent<HTMLDivElement>, leadId: string) {
@@ -61,8 +45,8 @@ export function PipelineClient({ leads }: { leads: LeadRow[] }) {
     setDraggedLeadId(leadId);
   }
 
-  function handleDragEnd() {
-    setDraggedLeadId(null);
+  if (isLoading) {
+    return null;
   }
 
   const isDragging = !!draggedLeadId;
@@ -71,17 +55,14 @@ export function PipelineClient({ leads }: { leads: LeadRow[] }) {
     : null;
 
   return (
-    <>
-      <header className="flex h-14 items-center gap-3 border-b px-4">
-        <SidebarTrigger />
-        <Separator className="h-5" orientation="vertical" />
+    <div className="flex h-full flex-col">
+      <PageHeader>
         <h1 className="font-semibold text-lg tracking-tight">Pipeline</h1>
-      </header>
+      </PageHeader>
 
-      <div className="flex flex-1 gap-3 overflow-x-auto p-4">
+      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
         {columns.map((col) => {
           const isSameColumn = draggedLead?.status === col.status;
-
           return (
             <div
               className={`flex w-72 shrink-0 flex-col rounded-sm border transition-colors ${
@@ -96,13 +77,14 @@ export function PipelineClient({ leads }: { leads: LeadRow[] }) {
               }}
               onDrop={(e) => handleDrop(e, col.status)}
             >
-              <div className="flex items-center justify-between border-b px-3 py-2">
-                <span
-                  className={`rounded-sm px-1.5 py-0.5 font-medium text-[10px] uppercase tracking-wider ${STATUS_COLORS[col.status]}`}
-                >
-                  {col.label}
-                </span>
-                <span className="font-mono text-muted-foreground text-xs">
+              <div className="flex items-center justify-between border-b px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`size-2 rounded-full ${STATUS_COLORS[col.status].split(" ")[0]}`}
+                  />
+                  <span className="font-medium text-xs">{col.label}</span>
+                </div>
+                <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                   {col.leads.length}
                 </span>
               </div>
@@ -115,12 +97,12 @@ export function PipelineClient({ leads }: { leads: LeadRow[] }) {
                 )}
                 {col.leads.map((lead) => (
                   <div
-                    className={`cursor-grab rounded-sm border bg-background p-2.5 transition-colors hover:bg-muted/30 active:cursor-grabbing ${
-                      draggedLeadId === lead.id ? "opacity-50" : ""
+                    className={`cursor-grab rounded-md border bg-background p-3 transition-all hover:border-border hover:bg-muted/30 active:cursor-grabbing ${
+                      draggedLeadId === lead.id ? "scale-95 opacity-40" : ""
                     }`}
                     draggable
                     key={lead.id}
-                    onDragEnd={handleDragEnd}
+                    onDragEnd={() => setDraggedLeadId(null)}
                     onDragStart={(e) => handleDragStart(e, lead.id)}
                   >
                     <Link className="block" href={`/leads/${lead.id}`}>
@@ -141,16 +123,25 @@ export function PipelineClient({ leads }: { leads: LeadRow[] }) {
                           </span>
                           {lead.value > 0 && (
                             <span className="font-mono text-xs">
-                              {formatValue(lead.value)}
+                              {formatCents(lead.value)}
                             </span>
                           )}
                         </div>
                       )}
-                      <p className="mt-1 text-[10px] text-muted-foreground">
-                        {formatDistanceToNow(new Date(lead.createdAt), {
-                          addSuffix: true,
-                        })}
-                      </p>
+                      <div className="mt-1.5 flex items-center justify-between">
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatDistanceToNow(new Date(lead.createdAt), {
+                            addSuffix: true,
+                          })}
+                        </span>
+                        {lead.assignedUser && (
+                          <Avatar className="size-4">
+                            <AvatarFallback className="bg-muted text-[6px] text-muted-foreground">
+                              {getInitials(lead.assignedUser.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                      </div>
                     </Link>
                   </div>
                 ))}
@@ -159,6 +150,6 @@ export function PipelineClient({ leads }: { leads: LeadRow[] }) {
           );
         })}
       </div>
-    </>
+    </div>
   );
 }

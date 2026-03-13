@@ -9,7 +9,6 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 
-// ── Auth tables ──
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -160,6 +159,7 @@ export const task = pgTable(
     dueAt: timestamp("due_at").notNull(),
     completedAt: timestamp("completed_at"),
     type: text("type").notNull().default("follow_up"),
+    recurrence: text("recurrence"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

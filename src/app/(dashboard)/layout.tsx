@@ -1,6 +1,8 @@
 "use client";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { CommandMenu } from "@/components/command-menu";
+import { QueryProvider } from "@/components/query-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 export default function DashboardLayout({
@@ -9,9 +11,12 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>{children}</SidebarInset>
-    </SidebarProvider>
+    <QueryProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>{children}</SidebarInset>
+        <CommandMenu />
+      </SidebarProvider>
+    </QueryProvider>
   );
 }

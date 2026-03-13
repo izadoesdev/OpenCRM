@@ -1,16 +1,10 @@
 "use client";
 
 import {
-  Analytics01Icon,
-  Building01Icon,
-  Calendar01Icon,
   Contact01Icon,
   DashboardBrowsingIcon,
   FilterIcon,
   Logout01Icon,
-  Mail01Icon,
-  Setting06Icon,
-  SparklesIcon,
   Task01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -23,40 +17,20 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { signOut, useSession } from "@/lib/auth-client";
+import { getInitials } from "@/lib/utils";
 
-const mainNav = [
+const navItems = [
   { title: "Dashboard", href: "/", icon: DashboardBrowsingIcon },
   { title: "Leads", href: "/leads", icon: Contact01Icon },
   { title: "Pipeline", href: "/pipeline", icon: FilterIcon },
-  { title: "Companies", href: "/companies", icon: Building01Icon },
   { title: "Tasks", href: "/tasks", icon: Task01Icon },
 ];
-
-const secondaryNav = [
-  { title: "Email", href: "/email", icon: Mail01Icon },
-  { title: "Calendar", href: "/calendar", icon: Calendar01Icon },
-  { title: "Analytics", href: "/analytics", icon: Analytics01Icon },
-  { title: "AI Insights", href: "/insights", icon: SparklesIcon },
-];
-
-function getInitials(name: string | undefined | null): string {
-  if (!name) {
-    return "?";
-  }
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -67,73 +41,54 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
-      <SidebarContent className="pt-2">
-        <SidebarGroup>
-          <SidebarGroupLabel>Main</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mainNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    isActive={pathname === item.href}
-                    render={<Link href={item.href} />}
-                    tooltip={item.title}
-                  >
-                    <HugeiconsIcon
-                      icon={item.icon}
-                      size={18}
-                      strokeWidth={pathname === item.href ? 2 : 1.5}
-                    />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      <SidebarHeader className="px-3 py-3">
+        <Link className="flex items-center gap-2.5 px-2" href="/">
+          <div className="flex size-7 items-center justify-center rounded-md bg-primary font-bold text-primary-foreground text-xs">
+            D
+          </div>
+          <span className="font-semibold text-sm tracking-tight group-data-[collapsible=icon]:hidden">
+            DataCRM
+          </span>
+        </Link>
+      </SidebarHeader>
 
+      <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Tools</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {secondaryNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    isActive={pathname === item.href}
-                    render={<Link href={item.href} />}
-                    tooltip={item.title}
-                  >
-                    <HugeiconsIcon
-                      icon={item.icon}
-                      size={18}
-                      strokeWidth={pathname === item.href ? 2 : 1.5}
-                    />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {navItems.map((item) => {
+                const active =
+                  item.href === "/"
+                    ? pathname === "/"
+                    : pathname.startsWith(item.href);
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      isActive={active}
+                      render={<Link href={item.href} />}
+                      tooltip={item.title}
+                    >
+                      <HugeiconsIcon
+                        icon={item.icon}
+                        size={18}
+                        strokeWidth={active ? 2 : 1.5}
+                      />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarSeparator />
-
-      <SidebarFooter className="px-3 py-3">
+      <SidebarFooter className="border-t px-3 py-2">
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              render={<Link href="/settings" />}
-              tooltip="Settings"
-            >
-              <HugeiconsIcon icon={Setting06Icon} size={18} strokeWidth={1.5} />
-              <span>Settings</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" tooltip={user?.name ?? "Account"}>
               <Avatar className="size-7">
-                <AvatarFallback className="bg-muted font-medium text-muted-foreground text-xs">
+                <AvatarFallback className="bg-primary/10 font-medium text-primary text-xs">
                   {getInitials(user?.name)}
                 </AvatarFallback>
               </Avatar>

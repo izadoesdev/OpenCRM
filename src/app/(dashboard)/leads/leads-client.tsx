@@ -2,15 +2,18 @@
 
 import {
   Add01Icon,
+  Cancel01Icon,
   Delete02Icon,
   MoreHorizontalIcon,
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { formatDistanceToNow } from "date-fns";
-import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
+import { PageHeader } from "@/components/page-header";
+import { StatusBadge, StatusDot } from "@/components/status-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,8 +25,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Table,
   TableBody,
@@ -33,49 +34,32 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { LeadRow } from "@/lib/actions/leads";
+import { LEAD_STATUSES, SOURCE_LABELS, STATUS_LABELS } from "@/lib/constants";
 import {
-  bulkDeleteLeads,
-  bulkUpdateStatus,
-  deleteLead,
-} from "@/lib/actions/leads";
-import {
-  LEAD_STATUSES,
-  SOURCE_LABELS,
-  STATUS_COLORS,
-  STATUS_LABELS,
-} from "@/lib/constants";
+  useBulkDeleteLeads,
+  useBulkUpdateStatus,
+  useDeleteLead,
+  useLeadCounts,
+  useLeads,
+} from "@/lib/queries";
+import { formatCents, getInitials } from "@/lib/utils";
 
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
+export function LeadsPageClient() {
+  const router = useRouter();
+  const { data: leads = [], isLoading } = useLeads();
+  const { data: counts = {} } = useLeadCounts();
 
-function formatValue(cents: number): string {
-  if (cents === 0) {
-    return "—";
-  }
-  return `$${(cents / 100).toLocaleString()}`;
-}
-
-export function LeadsPageClient({
-  initialLeads,
-  counts,
-}: {
-  initialLeads: LeadRow[];
-  counts: Record<string, number>;
-}) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showForm, setShowForm] = useState(false);
   const [editLead, setEditLead] = useState<LeadRow | undefined>();
-  const [, startTransition] = useTransition();
 
-  const filtered = initialLeads.filter((lead) => {
+  const deleteLead = useDeleteLead();
+  const bulkUpdate = useBulkUpdateStatus();
+  const bulkDelete = useBulkDeleteLeads();
+
+  const filtered = leads.filter((lead) => {
     if (statusFilter !== "all" && lead.status !== statusFilter) {
       return false;
     }
@@ -91,11 +75,11 @@ export function LeadsPageClient({
   });
 
   function toggleAll() {
-    if (selected.size === filtered.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(filtered.map((l) => l.id)));
-    }
+    setSelected(
+      selected.size === filtered.length
+        ? new Set()
+        : new Set(filtered.map((l) => l.id))
+    );
   }
 
   function toggleOne(id: string) {
@@ -108,25 +92,13 @@ export function LeadsPageClient({
     setSelected(next);
   }
 
-  function handleBulkStatus(status: string) {
-    startTransition(async () => {
-      await bulkUpdateStatus([...selected], status);
-      setSelected(new Set());
-    });
-  }
-
-  function handleBulkDelete() {
-    startTransition(async () => {
-      await bulkDeleteLeads([...selected]);
-      setSelected(new Set());
-    });
+  if (isLoading) {
+    return null;
   }
 
   return (
-    <>
-      <header className="flex h-14 items-center gap-3 border-b px-4">
-        <SidebarTrigger />
-        <Separator className="h-5" orientation="vertical" />
+    <div className="flex h-full flex-col">
+      <PageHeader>
         <div className="flex flex-1 items-center justify-between">
           <h1 className="font-semibold text-lg tracking-tight">Leads</h1>
           <Button
@@ -140,9 +112,9 @@ export function LeadsPageClient({
             Add Lead
           </Button>
         </div>
-      </header>
+      </PageHeader>
 
-      <div className="flex flex-col gap-3 p-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <HugeiconsIcon
@@ -152,39 +124,61 @@ export function LeadsPageClient({
               strokeWidth={1.5}
             />
             <Input
-              className="h-8 w-64 pl-8"
+              className="h-8 w-64 pr-7 pl-8"
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setSearch("");
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
               placeholder="Search leads..."
               value={search}
             />
+            {search && (
+              <button
+                aria-label="Clear search"
+                className="absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+                onClick={() => setSearch("")}
+                type="button"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 rounded-md border p-0.5">
             <button
-              className={`rounded-sm px-2 py-1 text-xs transition-colors ${
+              className={`rounded-sm px-2.5 py-1 text-xs transition-colors ${
                 statusFilter === "all"
-                  ? "bg-muted text-foreground"
+                  ? "bg-muted text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
               onClick={() => setStatusFilter("all")}
               type="button"
             >
-              All{" "}
-              <span className="text-muted-foreground">{counts.all ?? 0}</span>
+              All
+              <span className="ml-1 font-mono text-muted-foreground">
+                {counts.all ?? 0}
+              </span>
             </button>
             {LEAD_STATUSES.map((s) => (
               <button
-                className={`rounded-sm px-2 py-1 text-xs transition-colors ${
+                className={`rounded-sm px-2.5 py-1 text-xs transition-colors ${
                   statusFilter === s
-                    ? "bg-muted text-foreground"
+                    ? "bg-muted text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
                 key={s}
                 onClick={() => setStatusFilter(s)}
                 type="button"
               >
-                {STATUS_LABELS[s]}{" "}
-                <span className="text-muted-foreground">{counts[s] ?? 0}</span>
+                {STATUS_LABELS[s]}
+                {(counts[s] ?? 0) > 0 && (
+                  <span className="ml-1 font-mono text-muted-foreground">
+                    {counts[s]}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -204,14 +198,25 @@ export function LeadsPageClient({
                   {LEAD_STATUSES.map((s) => (
                     <DropdownMenuItem
                       key={s}
-                      onClick={() => handleBulkStatus(s)}
+                      onClick={() => {
+                        bulkUpdate.mutate({ ids: [...selected], status: s });
+                        setSelected(new Set());
+                      }}
                     >
+                      <StatusDot status={s} />
                       {STATUS_LABELS[s]}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button onClick={handleBulkDelete} size="sm" variant="outline">
+              <Button
+                onClick={() => {
+                  bulkDelete.mutate([...selected]);
+                  setSelected(new Set());
+                }}
+                size="sm"
+                variant="outline"
+              >
                 <HugeiconsIcon
                   icon={Delete02Icon}
                   size={14}
@@ -223,7 +228,7 @@ export function LeadsPageClient({
           )}
         </div>
 
-        <div className="rounded-sm border">
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-sm border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -236,7 +241,7 @@ export function LeadsPageClient({
                   />
                 </TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Company</TableHead>
+                <TableHead>Owner</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead className="text-right">Value</TableHead>
@@ -256,18 +261,28 @@ export function LeadsPageClient({
                 </TableRow>
               )}
               {filtered.map((lead) => (
-                <TableRow key={lead.id}>
-                  <TableCell>
+                <TableRow
+                  className="cursor-pointer"
+                  key={lead.id}
+                  onClick={(e) => {
+                    if (
+                      (e.target as HTMLElement).closest(
+                        "button, a, [role=menuitem], [data-slot=checkbox]"
+                      )
+                    ) {
+                      return;
+                    }
+                    router.push(`/leads/${lead.id}`);
+                  }}
+                >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={selected.has(lead.id)}
                       onCheckedChange={() => toggleOne(lead.id)}
                     />
                   </TableCell>
                   <TableCell>
-                    <Link
-                      className="flex items-center gap-2 hover:underline"
-                      href={`/leads/${lead.id}`}
-                    >
+                    <div className="flex items-center gap-2">
                       <Avatar className="size-7">
                         <AvatarFallback className="bg-muted text-[10px] text-muted-foreground">
                           {getInitials(lead.name)}
@@ -278,33 +293,46 @@ export function LeadsPageClient({
                           {lead.name}
                         </p>
                         <p className="truncate text-muted-foreground text-xs">
-                          {lead.email}
+                          {lead.company
+                            ? `${lead.company} · ${lead.email}`
+                            : lead.email}
                         </p>
                       </div>
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {lead.company ?? "—"}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <span
-                      className={`inline-flex rounded-sm px-1.5 py-0.5 font-medium text-[10px] uppercase tracking-wider ${STATUS_COLORS[lead.status]}`}
-                    >
-                      {STATUS_LABELS[lead.status]}
-                    </span>
+                    {lead.assignedUser ? (
+                      <div className="flex items-center gap-2">
+                        <Avatar className="size-6">
+                          <AvatarFallback className="bg-primary/10 text-[9px] text-primary">
+                            {getInitials(lead.assignedUser.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate text-sm">
+                          {lead.assignedUser.name}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground/40 text-xs">
+                        Unassigned
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={lead.status} />
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {SOURCE_LABELS[lead.source] ?? lead.source}
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm">
-                    {formatValue(lead.value)}
+                    {formatCents(lead.value)}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {formatDistanceToNow(new Date(lead.createdAt), {
                       addSuffix: true,
                     })}
                   </TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         render={<Button size="icon-sm" variant="ghost" />}
@@ -326,9 +354,7 @@ export function LeadsPageClient({
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          onClick={() =>
-                            startTransition(() => deleteLead(lead.id))
-                          }
+                          onClick={() => deleteLead.mutate(lead.id)}
                           variant="destructive"
                         >
                           Delete
@@ -348,6 +374,6 @@ export function LeadsPageClient({
         onOpenChange={setShowForm}
         open={showForm}
       />
-    </>
+    </div>
   );
 }

@@ -5,14 +5,18 @@ import {
   Delete02Icon,
   Edit02Icon,
   MoreHorizontalIcon,
+  RepeatIcon,
   Task01Icon,
-  Tick01Icon,
+  UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { addDays, format, isPast, isToday, isTomorrow } from "date-fns";
+import { format, isPast, isToday, isTomorrow } from "date-fns";
 import Link from "next/link";
-import { useOptimistic, useState, useTransition } from "react";
-import { toast } from "sonner";
+import { useState } from "react";
+import { PageHeader } from "@/components/page-header";
+import { StatusBadge } from "@/components/status-badge";
+import { TaskCheckbox } from "@/components/task-checkbox";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,39 +40,53 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useSession } from "@/lib/auth-client";
 import {
-  completeTask,
-  deleteTask,
-  rescheduleTask,
-  uncompleteTask,
-  updateTask,
-} from "@/lib/actions/tasks";
-import { STATUS_COLORS, STATUS_LABELS, TASK_TYPES } from "@/lib/constants";
+  RECURRENCE_LABELS,
+  TASK_TYPE_LABELS,
+  TASK_TYPES,
+} from "@/lib/constants";
+import {
+  useDeleteTask,
+  useRescheduleTask,
+  useTasks,
+  useTeamMembers,
+  useToggleTask,
+  useUpdateTask,
+} from "@/lib/queries";
+
+interface TaskUser {
+  email: string;
+  id: string;
+  image: string | null;
+  name: string;
+}
 
 interface TaskWithLead {
   completedAt: Date | null;
   description: string | null;
   dueAt: Date;
   id: string;
-  lead: {
-    id: string;
-    name: string;
-    status: string;
-  } | null;
+  lead: { id: string; name: string; status: string } | null;
   leadId: string;
+  recurrence: string | null;
   title: string;
   type: string;
+  user: TaskUser | null;
+  userId: string | null;
 }
 
-const TASK_TYPE_LABELS: Record<string, string> = {
-  follow_up: "Follow-up",
-  demo: "Demo",
-  call: "Call",
-  email: "Email",
-  other: "Other",
-};
+function getInitials(name?: string | null) {
+  if (!name) {
+    return "?";
+  }
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
 
 const TYPE_FILTERS = [
   { value: "all", label: "All types" },
@@ -78,43 +96,10 @@ const TYPE_FILTERS = [
   })),
 ];
 
-type OptimisticAction =
-  | { type: "toggle"; id: string; completed: boolean }
-  | { type: "delete"; id: string }
-  | { type: "update"; id: string; data: Partial<TaskWithLead> };
-
-function optimisticReducer(
-  tasks: TaskWithLead[],
-  action: OptimisticAction
-): TaskWithLead[] {
-  switch (action.type) {
-    case "toggle":
-      return tasks.map((t) =>
-        t.id === action.id
-          ? {
-              ...t,
-              completedAt: action.completed ? new Date() : null,
-            }
-          : t
-      );
-    case "delete":
-      return tasks.filter((t) => t.id !== action.id);
-    case "update":
-      return tasks.map((t) =>
-        t.id === action.id ? { ...t, ...action.data } : t
-      );
-    default:
-      return tasks;
-  }
-}
-
 function getDueLabel(
   dueAt: Date,
   completed: boolean
-): {
-  text: string;
-  className: string;
-} {
+): { text: string; className: string } {
   if (completed) {
     return { text: "Done", className: "text-muted-foreground" };
   }
@@ -150,25 +135,37 @@ function getEmptyMessage(typeFilter: string, showCompleted: boolean): string {
   return showCompleted ? "No tasks at all" : "All caught up";
 }
 
-export function TasksPageClient({
-  initialTasks,
-}: {
-  initialTasks: TaskWithLead[];
-}) {
+export function TasksPageClient() {
+  const session = useSession();
+  const currentUserId = session.data?.user?.id;
+
+  const [viewMode, setViewMode] = useState<"mine" | "all">("mine");
+  const [userFilter, setUserFilter] = useState<string>("all");
+
+  let effectiveUserId: string | undefined;
+  if (viewMode === "mine") {
+    effectiveUserId = currentUserId;
+  } else if (userFilter !== "all") {
+    effectiveUserId = userFilter;
+  }
+
+  const { data: allTasks = [], isLoading } = useTasks({
+    userId: effectiveUserId ?? null,
+  });
+  const { data: teamMembers = [] } = useTeamMembers();
+  const toggleTask = useToggleTask();
+  const deleteTaskMut = useDeleteTask();
+  const rescheduleTaskMut = useRescheduleTask();
+  const updateTaskMut = useUpdateTask();
+
   const [showCompleted, setShowCompleted] = useState(false);
   const [typeFilter, setTypeFilter] = useState("all");
-  const [isPending, startTransition] = useTransition();
-  const [optimisticTasks, dispatch] = useOptimistic(
-    initialTasks,
-    optimisticReducer
-  );
-
   const [editingTask, setEditingTask] = useState<TaskWithLead | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDue, setEditDue] = useState("");
   const [editType, setEditType] = useState("follow_up");
 
-  let tasks = optimisticTasks;
+  let tasks = allTasks as TaskWithLead[];
   if (!showCompleted) {
     tasks = tasks.filter((t) => !t.completedAt);
   }
@@ -192,51 +189,6 @@ export function TasksPageClient({
   );
   const completed = tasks.filter((t) => !!t.completedAt);
 
-  function handleToggle(task: TaskWithLead) {
-    const wasCompleted = !!task.completedAt;
-    startTransition(async () => {
-      dispatch({
-        type: "toggle",
-        id: task.id,
-        completed: !wasCompleted,
-      });
-      if (wasCompleted) {
-        await uncompleteTask(task.id);
-        toast("Task reopened");
-      } else {
-        await completeTask(task.id);
-        toast.success("Task completed");
-      }
-    });
-  }
-
-  function handleDelete(task: TaskWithLead) {
-    startTransition(async () => {
-      dispatch({ type: "delete", id: task.id });
-      await deleteTask(task.id);
-      toast("Task deleted");
-    });
-  }
-
-  function handleReschedule(task: TaskWithLead, days: number) {
-    const labels: Record<number, string> = {
-      1: "tomorrow",
-      3: "in 3 days",
-      7: "in 1 week",
-    };
-    startTransition(async () => {
-      const baseDate =
-        new Date(task.dueAt) < new Date() ? new Date() : new Date(task.dueAt);
-      dispatch({
-        type: "update",
-        id: task.id,
-        data: { dueAt: addDays(baseDate, days) },
-      });
-      await rescheduleTask(task.id, days);
-      toast(`Rescheduled ${labels[days] ?? `+${days}d`}`);
-    });
-  }
-
   function openEdit(task: TaskWithLead) {
     setEditingTask(task);
     setEditTitle(task.title);
@@ -248,49 +200,230 @@ export function TasksPageClient({
     if (!(editingTask && editTitle.trim())) {
       return;
     }
-    const taskId = editingTask.id;
-    startTransition(async () => {
-      dispatch({
-        type: "update",
-        id: taskId,
-        data: {
-          title: editTitle,
-          dueAt: new Date(editDue),
-          type: editType,
-        },
-      });
-      await updateTask(taskId, {
-        title: editTitle,
-        dueAt: new Date(editDue),
-        type: editType,
-      });
-      setEditingTask(null);
-      toast.success("Task updated");
+    updateTaskMut.mutate({
+      id: editingTask.id,
+      data: { title: editTitle, dueAt: new Date(editDue), type: editType },
+      leadId: editingTask.leadId,
     });
+    setEditingTask(null);
   }
 
-  function handleEditTypeChange(v: string | null) {
-    if (v) {
-      setEditType(v);
-    }
-  }
-
-  function handleTypeFilterChange(v: string | null) {
-    if (v) {
-      setTypeFilter(v);
-    }
-  }
-
-  const openCount = optimisticTasks.filter((t) => !t.completedAt).length;
-  const overdueCount = optimisticTasks.filter(
+  const openCount = (allTasks as TaskWithLead[]).filter(
+    (t) => !t.completedAt
+  ).length;
+  const overdueCount = (allTasks as TaskWithLead[]).filter(
     (t) => !t.completedAt && isPast(new Date(t.dueAt))
   ).length;
 
+  if (isLoading) {
+    return null;
+  }
+
+  function renderSection(
+    title: string,
+    items: TaskWithLead[],
+    labelClass?: string
+  ) {
+    if (items.length === 0) {
+      return null;
+    }
+    return (
+      <div>
+        <h2
+          className={`mb-1.5 flex items-center gap-2 font-medium text-[10px] uppercase tracking-widest ${labelClass ?? "text-muted-foreground"}`}
+        >
+          {title}
+          <span className="font-mono">{items.length}</span>
+          <span className="h-px flex-1 bg-border" />
+        </h2>
+        <div className="space-y-0.5">
+          {items.map((t) => {
+            const isComplete = !!t.completedAt;
+            const due = getDueLabel(new Date(t.dueAt), isComplete);
+            const showAssignee = viewMode === "all" && t.user;
+            return (
+              <div
+                className="group flex items-start gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-muted/40"
+                key={t.id}
+              >
+                <TaskCheckbox
+                  checked={isComplete}
+                  onChange={() =>
+                    toggleTask.mutate({
+                      id: t.id,
+                      isComplete,
+                      leadId: t.leadId,
+                    })
+                  }
+                />
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={`text-sm leading-tight ${isComplete ? "text-muted-foreground line-through" : ""}`}
+                  >
+                    {t.title}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {t.lead && (
+                      <Link
+                        className="text-xs transition-colors hover:text-foreground hover:underline"
+                        href={`/leads/${t.lead.id}`}
+                      >
+                        {t.lead.name}
+                      </Link>
+                    )}
+                    {t.lead && <StatusBadge status={t.lead.status} />}
+                    <span className="rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground uppercase">
+                      {TASK_TYPE_LABELS[t.type] ?? t.type}
+                    </span>
+                    {t.recurrence && (
+                      <span className="flex items-center gap-0.5 rounded bg-violet-500/15 px-1 py-0.5 text-[9px] text-violet-400 uppercase">
+                        <HugeiconsIcon
+                          icon={RepeatIcon}
+                          size={8}
+                          strokeWidth={2}
+                        />
+                        {RECURRENCE_LABELS[t.recurrence] ?? t.recurrence}
+                      </span>
+                    )}
+                    <span className={`text-xs ${due.className}`}>
+                      {due.text}
+                    </span>
+                  </div>
+                </div>
+
+                {showAssignee && t.user && (
+                  <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+                    <Avatar className="size-5">
+                      <AvatarFallback className="bg-primary/10 text-[7px] text-primary">
+                        {getInitials(t.user.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="hidden text-muted-foreground text-xs lg:inline">
+                      {t.user.name?.split(" ")[0]}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
+                  {!isComplete && (
+                    <Button
+                      onClick={() =>
+                        rescheduleTaskMut.mutate({
+                          id: t.id,
+                          days: 1,
+                          leadId: t.leadId,
+                        })
+                      }
+                      size="icon-sm"
+                      title="+1 day"
+                      variant="ghost"
+                    >
+                      <span className="font-mono text-[9px]">+1d</span>
+                    </Button>
+                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={<Button size="icon-sm" variant="ghost" />}
+                    >
+                      <HugeiconsIcon
+                        icon={MoreHorizontalIcon}
+                        size={12}
+                        strokeWidth={1.5}
+                      />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEdit(t)}>
+                        <HugeiconsIcon
+                          icon={Edit02Icon}
+                          size={14}
+                          strokeWidth={1.5}
+                        />
+                        Edit
+                      </DropdownMenuItem>
+                      {!isComplete && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() =>
+                              rescheduleTaskMut.mutate({
+                                id: t.id,
+                                days: 1,
+                                leadId: t.leadId,
+                              })
+                            }
+                          >
+                            <HugeiconsIcon
+                              icon={Calendar01Icon}
+                              size={14}
+                              strokeWidth={1.5}
+                            />
+                            Tomorrow
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              rescheduleTaskMut.mutate({
+                                id: t.id,
+                                days: 3,
+                                leadId: t.leadId,
+                              })
+                            }
+                          >
+                            <HugeiconsIcon
+                              icon={Calendar01Icon}
+                              size={14}
+                              strokeWidth={1.5}
+                            />
+                            +3 days
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              rescheduleTaskMut.mutate({
+                                id: t.id,
+                                days: 7,
+                                leadId: t.leadId,
+                              })
+                            }
+                          >
+                            <HugeiconsIcon
+                              icon={Calendar01Icon}
+                              size={14}
+                              strokeWidth={1.5}
+                            />
+                            +1 week
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() =>
+                          deleteTaskMut.mutate({
+                            id: t.id,
+                            leadId: t.leadId,
+                          })
+                        }
+                        variant="destructive"
+                      >
+                        <HugeiconsIcon
+                          icon={Delete02Icon}
+                          size={14}
+                          strokeWidth={1.5}
+                        />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <>
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
-        <SidebarTrigger />
-        <Separator className="h-5" orientation="vertical" />
+    <div className="flex h-full flex-col">
+      <PageHeader>
         <div className="flex flex-1 items-center justify-between">
           <div className="flex items-center gap-2.5">
             <h1 className="font-semibold text-lg tracking-tight">Tasks</h1>
@@ -306,7 +439,71 @@ export function TasksPageClient({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Select onValueChange={handleTypeFilterChange} value={typeFilter}>
+            {/* My / All toggle */}
+            <div className="flex rounded-md border bg-muted/30 p-0.5">
+              <button
+                className={`rounded-sm px-2.5 py-1 text-xs transition-all ${
+                  viewMode === "mine"
+                    ? "bg-background font-medium shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => {
+                  setViewMode("mine");
+                  setUserFilter("all");
+                }}
+                type="button"
+              >
+                My Tasks
+              </button>
+              <button
+                className={`rounded-sm px-2.5 py-1 text-xs transition-all ${
+                  viewMode === "all"
+                    ? "bg-background font-medium shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => setViewMode("all")}
+                type="button"
+              >
+                All Tasks
+              </button>
+            </div>
+
+            {/* User filter (only in All mode) */}
+            {viewMode === "all" && teamMembers.length > 1 && (
+              <Select
+                onValueChange={(v) => v && setUserFilter(v)}
+                value={userFilter}
+              >
+                <SelectTrigger className="h-8 w-[140px] text-xs">
+                  <HugeiconsIcon
+                    className="mr-1 text-muted-foreground"
+                    icon={UserIcon}
+                    size={12}
+                    strokeWidth={1.5}
+                  />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Everyone</SelectItem>
+                  {(
+                    teamMembers as Array<{
+                      id: string;
+                      name: string;
+                      email: string;
+                    }>
+                  ).map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <Select
+              onValueChange={(v) => v && setTypeFilter(v)}
+              value={typeFilter}
+            >
               <SelectTrigger className="h-8 w-[120px] text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -327,9 +524,9 @@ export function TasksPageClient({
             </Button>
           </div>
         </div>
-      </header>
+      </PageHeader>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {tasks.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <HugeiconsIcon
@@ -367,237 +564,43 @@ export function TasksPageClient({
             <DialogTitle>Edit Task</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1.5">
-              <label
-                className="text-muted-foreground text-xs"
-                htmlFor="edit-task-title"
-              >
-                Title
-              </label>
-              <Input
-                autoFocus
-                id="edit-task-title"
-                onChange={(e) => setEditTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleSaveEdit();
-                  }
-                }}
-                value={editTitle}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label
-                  className="text-muted-foreground text-xs"
-                  htmlFor="edit-task-type"
-                >
-                  Type
-                </label>
-                <Select onValueChange={handleEditTypeChange} value={editType}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TASK_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {TASK_TYPE_LABELS[t] ?? t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <label
-                  className="text-muted-foreground text-xs"
-                  htmlFor="edit-task-due"
-                >
-                  Due
-                </label>
-                <Input
-                  id="edit-task-due"
-                  onChange={(e) => setEditDue(e.target.value)}
-                  type="datetime-local"
-                  value={editDue}
-                />
-              </div>
-            </div>
+            <Input
+              autoFocus
+              onChange={(e) => setEditTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleSaveEdit();
+                }
+              }}
+              placeholder="Task title"
+              value={editTitle}
+            />
+            <Select onValueChange={(v) => v && setEditType(v)} value={editType}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TASK_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {TASK_TYPE_LABELS[t] ?? t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              onChange={(e) => setEditDue(e.target.value)}
+              type="datetime-local"
+              value={editDue}
+            />
           </div>
           <DialogFooter>
-            <Button disabled={isPending} onClick={handleSaveEdit}>
-              {isPending ? "Saving..." : "Save"}
+            <Button onClick={handleSaveEdit} size="sm">
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
-
-  function renderSection(title: string, items: TaskWithLead[], color?: string) {
-    if (items.length === 0) {
-      return null;
-    }
-    return (
-      <div>
-        <h3
-          className={`mb-2 font-medium text-xs uppercase tracking-wider ${color ?? "text-muted-foreground"}`}
-        >
-          {title} <span className="font-mono">({items.length})</span>
-        </h3>
-        <div className="space-y-1">
-          {items.map((t) => {
-            const due = getDueLabel(new Date(t.dueAt), !!t.completedAt);
-            const isComplete = !!t.completedAt;
-
-            return (
-              <div
-                className={`group flex items-start gap-3 rounded-md border px-3 py-2.5 transition-colors hover:bg-muted/30 ${isComplete ? "opacity-50" : ""}`}
-                key={t.id}
-              >
-                <button
-                  className={`mt-0.5 flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-[4px] border transition-colors ${
-                    isComplete
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input hover:border-primary/50 hover:bg-primary/10"
-                  }`}
-                  onClick={() => handleToggle(t)}
-                  type="button"
-                >
-                  {isComplete && (
-                    <HugeiconsIcon
-                      icon={Tick01Icon}
-                      size={10}
-                      strokeWidth={2.5}
-                    />
-                  )}
-                </button>
-
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`text-sm leading-tight ${isComplete ? "text-muted-foreground line-through" : ""}`}
-                  >
-                    {t.title}
-                  </p>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    {t.lead && (
-                      <Link
-                        className="text-xs transition-colors hover:text-foreground hover:underline"
-                        href={`/leads/${t.lead.id}`}
-                      >
-                        {t.lead.name}
-                      </Link>
-                    )}
-                    {t.lead && (
-                      <span
-                        className={`rounded-sm px-1 py-0.5 text-[9px] uppercase tracking-wider ${STATUS_COLORS[t.lead.status]}`}
-                      >
-                        {STATUS_LABELS[t.lead.status]}
-                      </span>
-                    )}
-                    <span className={`text-xs ${due.className}`}>
-                      {due.text}
-                    </span>
-                    <span className="rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground uppercase">
-                      {TASK_TYPE_LABELS[t.type] ?? t.type}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                  {!isComplete && (
-                    <>
-                      <Button
-                        onClick={() => handleReschedule(t, 1)}
-                        size="icon-sm"
-                        title="+1 day"
-                        variant="ghost"
-                      >
-                        <span className="font-mono text-[9px]">+1d</span>
-                      </Button>
-                      <Button
-                        onClick={() => handleReschedule(t, 3)}
-                        size="icon-sm"
-                        title="+3 days"
-                        variant="ghost"
-                      >
-                        <span className="font-mono text-[9px]">+3d</span>
-                      </Button>
-                    </>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={<Button size="icon-sm" variant="ghost" />}
-                    >
-                      <HugeiconsIcon
-                        icon={MoreHorizontalIcon}
-                        size={14}
-                        strokeWidth={1.5}
-                      />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEdit(t)}>
-                        <HugeiconsIcon
-                          icon={Edit02Icon}
-                          size={14}
-                          strokeWidth={1.5}
-                        />
-                        Edit
-                      </DropdownMenuItem>
-                      {!isComplete && (
-                        <>
-                          <DropdownMenuItem
-                            onClick={() => handleReschedule(t, 1)}
-                          >
-                            <HugeiconsIcon
-                              icon={Calendar01Icon}
-                              size={14}
-                              strokeWidth={1.5}
-                            />
-                            Tomorrow
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleReschedule(t, 3)}
-                          >
-                            <HugeiconsIcon
-                              icon={Calendar01Icon}
-                              size={14}
-                              strokeWidth={1.5}
-                            />
-                            +3 days
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleReschedule(t, 7)}
-                          >
-                            <HugeiconsIcon
-                              icon={Calendar01Icon}
-                              size={14}
-                              strokeWidth={1.5}
-                            />
-                            +1 week
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => handleDelete(t)}
-                        variant="destructive"
-                      >
-                        <HugeiconsIcon
-                          icon={Delete02Icon}
-                          size={14}
-                          strokeWidth={1.5}
-                        />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
 }

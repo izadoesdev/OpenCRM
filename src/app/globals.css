@@ -126,4 +126,36 @@
   html {
     @apply font-sans;
   }
+
+  /* Scrollbar */
+  * {
+    scrollbar-color: oklch(0.28 0.005 250) transparent;
+    scrollbar-width: thin;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: oklch(0.28 0.005 250);
+    border-radius: 3px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.35 0.005 250);
+  }
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  ::selection {
+    background: oklch(0.6 0.15 250 / 0.3);
+  }
+
+  a,
+  button {
+    transition-duration: 150ms;
+  }
 }

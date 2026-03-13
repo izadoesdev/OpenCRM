@@ -1,6 +1,6 @@
 "use server";
 
-import { asc, count, desc, eq, isNull, sql, sum } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull, sql, sum } from "drizzle-orm";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { lead, task } from "@/db/schema";
@@ -61,15 +61,37 @@ export async function getRecentLeads() {
   return db.query.lead.findMany({
     orderBy: [desc(lead.createdAt)],
     limit: 5,
+    with: { assignedUser: true },
   });
 }
 
-export async function getUpcomingTasks() {
-  await getUser();
+export async function getUpcomingTasks(opts?: { allUsers?: boolean }) {
+  const currentUser = await getUser();
+  const conditions = [isNull(task.completedAt)];
+  if (!opts?.allUsers) {
+    conditions.push(eq(task.userId, currentUser.id));
+  }
   return db.query.task.findMany({
-    where: isNull(task.completedAt),
+    where: and(...conditions),
     orderBy: [asc(task.dueAt)],
-    limit: 5,
-    with: { lead: true },
+    limit: 15,
+    with: { lead: true, user: true },
   });
+}
+
+export async function getPipelineCounts() {
+  await getUser();
+  const rows = await db
+    .select({ status: lead.status, count: count() })
+    .from(lead)
+    .groupBy(lead.status);
+
+  const counts: Record<string, number> = {};
+  let total = 0;
+  for (const r of rows) {
+    counts[r.status] = r.count;
+    total += r.count;
+  }
+  counts.all = total;
+  return counts;
 }

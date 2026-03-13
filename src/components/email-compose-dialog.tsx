@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { sendLeadEmail } from "@/lib/actions/email-templates";
+import { useSendEmail } from "@/lib/queries";
 
 interface Template {
   body: string;
@@ -41,18 +41,16 @@ export function EmailComposeDialog({
   leadName: string;
   templates: Template[];
 }) {
-  const [isPending, startTransition] = useTransition();
+  const sendEmail = useSendEmail();
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [templateId, setTemplateId] = useState<string>("");
-  const [error, setError] = useState("");
+  const [templateId, setTemplateId] = useState("");
 
   useEffect(() => {
     if (open) {
       setSubject("");
       setBody("");
       setTemplateId("");
-      setError("");
     }
   }, [open]);
 
@@ -73,30 +71,10 @@ export function EmailComposeDialog({
     if (!(subject.trim() && body.trim())) {
       return;
     }
-    setError("");
-
-    startTransition(async () => {
-      try {
-        await sendLeadEmail(leadId, {
-          subject,
-          body,
-          templateId: templateId || undefined,
-        });
-        setSubject("");
-        setBody("");
-        setTemplateId("");
-        onOpenChange(false);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to send");
-      }
-    });
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      handleSend();
-    }
+    sendEmail.mutate(
+      { leadId, data: { subject, body, templateId: templateId || undefined } },
+      { onSuccess: () => onOpenChange(false) }
+    );
   }
 
   return (
@@ -112,7 +90,12 @@ export function EmailComposeDialog({
 
         <form
           className="space-y-3"
-          onKeyDown={handleKeyDown}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
           onSubmit={handleSend}
         >
           {templates.length > 0 && (
@@ -178,11 +161,9 @@ export function EmailComposeDialog({
             </p>
           </div>
 
-          {error && <p className="text-destructive text-sm">{error}</p>}
-
           <DialogFooter>
-            <Button disabled={isPending} type="submit">
-              {isPending ? "Sending..." : "Send Email"}
+            <Button disabled={sendEmail.isPending} type="submit">
+              {sendEmail.isPending ? "Sending..." : "Send Email"}
             </Button>
           </DialogFooter>
         </form>

@@ -14,16 +14,18 @@ import {
   Note01Icon,
   SentIcon,
   Task01Icon,
-  Tick01Icon,
+  UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { addDays, format, formatDistanceToNow, isPast } from "date-fns";
+import { format, formatDistanceToNow, isPast } from "date-fns";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { toast } from "sonner";
+import { useState } from "react";
 import { EmailComposeDialog } from "@/components/email-compose-dialog";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
+import { PageHeader } from "@/components/page-header";
+import { StatusBadge, StatusDot } from "@/components/status-badge";
+import { TaskCheckbox } from "@/components/task-checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,78 +50,43 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
-import { deleteLead } from "@/lib/actions/leads";
-import { addNote, changeLeadStatus, logOutreach } from "@/lib/actions/status";
-import {
-  completeTask,
-  createTask,
-  deleteTask,
-  rescheduleTask,
-  uncompleteTask,
-} from "@/lib/actions/tasks";
 import {
   LEAD_PLANS,
   LEAD_STATUSES,
+  RECURRENCE_LABELS,
   SOURCE_LABELS,
-  STATUS_COLORS,
   STATUS_LABELS,
+  TASK_RECURRENCES,
+  TASK_TYPE_LABELS,
   TASK_TYPES,
 } from "@/lib/constants";
+import {
+  useAddNote,
+  useAssignLead,
+  useChangeLeadStatus,
+  useCreateTask,
+  useDeleteLead,
+  useDeleteTask,
+  useEmailTemplates,
+  useLead,
+  useLogOutreach,
+  useRescheduleTask,
+  useTeamMembers,
+  useToggleTask,
+} from "@/lib/queries";
+import {
+  defaultDueDate,
+  formatCents,
+  formatWebsite,
+  getInitials,
+} from "@/lib/utils";
 
-interface LeadDetail {
-  activities: Array<{
-    id: string;
-    type: string;
-    content: string | null;
-    metadata: unknown;
-    createdAt: Date;
-    user: { name: string; email: string } | null;
-  }>;
-  assignedTo: string | null;
-  assignedUser: { name: string; email: string } | null;
-  churnedAt: Date | null;
-  company: string | null;
-  convertedAt: Date | null;
-  createdAt: Date;
+interface TeamMember {
   email: string;
   id: string;
-  lostAt: Date | null;
+  image: string | null;
   name: string;
-  phone: string | null;
-  plan: string | null;
-  source: string;
-  status: string;
-  tasks: Array<{
-    id: string;
-    title: string;
-    description: string | null;
-    dueAt: Date;
-    completedAt: Date | null;
-    type: string;
-  }>;
-  title: string | null;
-  updatedAt: Date;
-  value: number;
-  website: string | null;
-}
-
-interface Template {
-  body: string;
-  id: string;
-  name: string;
-  subject: string;
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 const ACTIVITY_ICONS: Record<string, typeof Mail01Icon> = {
@@ -131,34 +98,22 @@ const ACTIVITY_ICONS: Record<string, typeof Mail01Icon> = {
   status_change: Task01Icon,
 };
 
-const TASK_TYPE_LABELS: Record<string, string> = {
-  follow_up: "Follow-up",
-  demo: "Demo",
-  call: "Call",
-  email: "Email",
-  other: "Other",
-};
-
-function defaultDueDate(): string {
-  return format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm");
-}
-
-const RE_PROTOCOL = /^https?:\/\/(www\.)?/;
-const RE_TRAILING_SLASH = /\/$/;
-
-function formatWebsite(url: string): string {
-  return url.replace(RE_PROTOCOL, "").replace(RE_TRAILING_SLASH, "");
-}
-
-export function LeadDetailClient({
-  lead,
-  templates,
-}: {
-  lead: LeadDetail;
-  templates: Template[];
-}) {
+export function LeadDetailClient({ leadId }: { leadId: string }) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const { data: lead, isLoading, isError } = useLead(leadId);
+  const { data: templates = [] } = useEmailTemplates();
+
+  const changeStatus = useChangeLeadStatus();
+  const addNote = useAddNote();
+  const logOutreach = useLogOutreach();
+  const deleteLeadMut = useDeleteLead();
+  const createTask = useCreateTask();
+  const toggleTask = useToggleTask();
+  const deleteTaskMut = useDeleteTask();
+  const rescheduleTask = useRescheduleTask();
+  const assignLead = useAssignLead();
+  const { data: teamMembers = [] as TeamMember[] } = useTeamMembers();
+
   const [showEdit, setShowEdit] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
   const [noteText, setNoteText] = useState("");
@@ -167,7 +122,30 @@ export function LeadDetailClient({
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDue, setNewTaskDue] = useState(defaultDueDate);
   const [newTaskType, setNewTaskType] = useState("follow_up");
+  const [newTaskAssignee, setNewTaskAssignee] = useState<string>("_self");
+  const [newTaskRecurrence, setNewTaskRecurrence] = useState<string>("none");
 
+  if (isLoading) {
+    return null;
+  }
+
+  if (isError || !lead) {
+    return (
+      <div className="flex h-full flex-col">
+        <PageHeader>
+          <Button render={<Link href="/leads" />} size="sm" variant="ghost">
+            <HugeiconsIcon icon={ArrowLeft02Icon} size={14} strokeWidth={2} />
+            Leads
+          </Button>
+        </PageHeader>
+        <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
+          Lead not found
+        </div>
+      </div>
+    );
+  }
+
+  const id = lead.id;
   const nextStatuses = LEAD_STATUSES.filter((s) => s !== lead.status);
   const openTasks = lead.tasks.filter((t) => !t.completedAt);
   const completedTasks = lead.tasks.filter((t) => !!t.completedAt);
@@ -177,310 +155,176 @@ export function LeadDetailClient({
       setShowPlanPicker(true);
       return;
     }
-    startTransition(async () => {
-      await changeLeadStatus(lead.id, status);
-      toast.success(`Moved to ${STATUS_LABELS[status]}`);
-    });
+    changeStatus.mutate({ leadId: id, status });
   }
 
   function handleConvertWithPlan(plan: string) {
     setShowPlanPicker(false);
-    startTransition(async () => {
-      await changeLeadStatus(lead.id, "converted", { plan });
-      toast.success("Lead converted");
-    });
+    changeStatus.mutate({ leadId: id, status: "converted", opts: { plan } });
   }
 
   function handleAddNote() {
     if (!noteText.trim()) {
       return;
     }
-    const text = noteText;
-    startTransition(async () => {
-      await addNote(lead.id, text);
-      setNoteText("");
-      toast.success("Note added");
-    });
+    addNote.mutate({ leadId: id, content: noteText });
+    setNoteText("");
   }
 
   function handleAddTask() {
     if (!(newTaskTitle.trim() && newTaskDue)) {
       return;
     }
-    startTransition(async () => {
-      await createTask({
-        leadId: lead.id,
-        title: newTaskTitle,
-        dueAt: new Date(newTaskDue),
-        type: newTaskType,
-      });
-      setNewTaskTitle("");
-      setNewTaskDue(defaultDueDate());
-      setNewTaskType("follow_up");
-      setShowAddTask(false);
-      toast.success("Task created");
+    createTask.mutate({
+      leadId: id,
+      title: newTaskTitle,
+      dueAt: new Date(newTaskDue),
+      type: newTaskType,
+      userId: newTaskAssignee === "_self" ? undefined : newTaskAssignee,
+      recurrence: newTaskRecurrence === "none" ? null : newTaskRecurrence,
     });
-  }
-
-  function handleToggleTask(taskId: string, wasCompleted: boolean) {
-    startTransition(async () => {
-      if (wasCompleted) {
-        await uncompleteTask(taskId);
-        toast("Task reopened");
-      } else {
-        await completeTask(taskId);
-        toast.success("Task completed");
-      }
-    });
-  }
-
-  function handleDeleteTask(taskId: string) {
-    startTransition(async () => {
-      await deleteTask(taskId);
-      toast("Task deleted");
-    });
-  }
-
-  function handleRescheduleTask(taskId: string, days: number) {
-    const labels: Record<number, string> = {
-      1: "tomorrow",
-      3: "in 3 days",
-      7: "in 1 week",
-    };
-    startTransition(async () => {
-      await rescheduleTask(taskId, days);
-      toast(`Rescheduled ${labels[days] ?? `+${days}d`}`);
-    });
-  }
-
-  function handleTaskTypeChange(v: string | null) {
-    if (v) {
-      setNewTaskType(v);
-    }
+    setNewTaskTitle("");
+    setNewTaskDue(defaultDueDate());
+    setNewTaskType("follow_up");
+    setNewTaskAssignee("_self");
+    setNewTaskRecurrence("none");
+    setShowAddTask(false);
   }
 
   return (
-    <>
-      {/* Header */}
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
-        <SidebarTrigger />
-        <Separator className="h-5" orientation="vertical" />
-        <Button render={<Link href="/leads" />} size="sm" variant="ghost">
-          <HugeiconsIcon icon={ArrowLeft02Icon} size={14} strokeWidth={2} />
-          Leads
-        </Button>
-      </header>
-
-      <div className="flex-1 overflow-y-auto">
-        {/* Profile strip */}
-        <div className="border-b px-6 py-5">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <Avatar className="size-12">
-                <AvatarFallback className="bg-muted text-lg text-muted-foreground">
-                  {getInitials(lead.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="flex items-center gap-2.5">
-                  <h1 className="font-semibold text-xl tracking-tight">
-                    {lead.name}
-                  </h1>
-                  <span
-                    className={`rounded-sm px-1.5 py-0.5 font-medium text-[10px] uppercase tracking-wider ${STATUS_COLORS[lead.status]}`}
+    <div className="flex h-full flex-col">
+      <PageHeader>
+        <div className="flex flex-1 items-center justify-between">
+          <Button render={<Link href="/leads" />} size="sm" variant="ghost">
+            <HugeiconsIcon icon={ArrowLeft02Icon} size={14} strokeWidth={2} />
+            Leads
+          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setShowEmail(true)}
+              size="sm"
+              variant="outline"
+            >
+              <HugeiconsIcon icon={Mail01Icon} size={14} strokeWidth={1.5} />
+              Email
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button size="sm" />}>
+                Move to...
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {nextStatuses.map((s) => (
+                  <DropdownMenuItem
+                    key={s}
+                    onClick={() => handleStatusChange(s)}
                   >
-                    {STATUS_LABELS[lead.status]}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-muted-foreground text-sm">
-                  {[lead.title, lead.company].filter(Boolean).join(" at ") ||
-                    "No title"}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => setShowEmail(true)}
-                size="sm"
-                variant="outline"
+                    <StatusDot status={s} />
+                    {STATUS_LABELS[s]}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<Button size="icon-sm" variant="ghost" />}
               >
-                <HugeiconsIcon icon={Mail01Icon} size={14} strokeWidth={1.5} />
-                Email
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger render={<Button size="sm" />}>
-                  Move to...
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {nextStatuses.map((s) => (
-                    <DropdownMenuItem
-                      key={s}
-                      onClick={() => handleStatusChange(s)}
-                    >
-                      <span
-                        className={`inline-block size-2 rounded-full ${STATUS_COLORS[s].split(" ")[0]}`}
-                      />
-                      {STATUS_LABELS[s]}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={<Button size="icon-sm" variant="ghost" />}
-                >
+                <HugeiconsIcon
+                  icon={MoreHorizontalIcon}
+                  size={14}
+                  strokeWidth={1.5}
+                />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowEdit(true)}>
                   <HugeiconsIcon
-                    icon={MoreHorizontalIcon}
+                    icon={Edit02Icon}
                     size={14}
                     strokeWidth={1.5}
                   />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setShowEdit(true)}>
-                    <HugeiconsIcon
-                      icon={Edit02Icon}
-                      size={14}
-                      strokeWidth={1.5}
-                    />
-                    Edit Lead
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() =>
-                      startTransition(async () => {
-                        await logOutreach(
-                          lead.id,
-                          "outreach_call",
-                          "Logged a call"
-                        );
-                        toast.success("Call logged");
-                      })
-                    }
-                  >
-                    <HugeiconsIcon
-                      icon={CallIcon}
-                      size={14}
-                      strokeWidth={1.5}
-                    />
-                    Log Call
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() =>
-                      startTransition(async () => {
-                        await logOutreach(
-                          lead.id,
-                          "outreach_linkedin",
-                          "Logged LinkedIn outreach"
-                        );
-                        toast.success("LinkedIn outreach logged");
-                      })
-                    }
-                  >
-                    <HugeiconsIcon
-                      icon={LinkSquare01Icon}
-                      size={14}
-                      strokeWidth={1.5}
-                    />
-                    Log LinkedIn
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() =>
-                      startTransition(async () => {
-                        await deleteLead(lead.id);
-                        router.push("/leads");
-                        toast("Lead deleted");
-                      })
-                    }
-                    variant="destructive"
-                  >
-                    <HugeiconsIcon
-                      icon={Delete02Icon}
-                      size={14}
-                      strokeWidth={1.5}
-                    />
-                    Delete Lead
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  Edit Lead
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() =>
+                    logOutreach.mutate({
+                      leadId: id,
+                      type: "outreach_call",
+                      content: "Logged a call",
+                    })
+                  }
+                >
+                  <HugeiconsIcon icon={CallIcon} size={14} strokeWidth={1.5} />
+                  Log Call
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() =>
+                    logOutreach.mutate({
+                      leadId: id,
+                      type: "outreach_linkedin",
+                      content: "Logged LinkedIn outreach",
+                    })
+                  }
+                >
+                  <HugeiconsIcon
+                    icon={LinkSquare01Icon}
+                    size={14}
+                    strokeWidth={1.5}
+                  />
+                  Log LinkedIn
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() =>
+                    deleteLeadMut.mutate(id, {
+                      onSuccess: () => router.push("/leads"),
+                    })
+                  }
+                  variant="destructive"
+                >
+                  <HugeiconsIcon
+                    icon={Delete02Icon}
+                    size={14}
+                    strokeWidth={1.5}
+                  />
+                  Delete Lead
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </PageHeader>
+
+      {/* Two-panel layout that fills viewport */}
+      <div className="flex min-h-0 flex-1">
+        {/* LEFT — Profile + Activity */}
+        <div className="flex min-h-0 flex-1 flex-col border-r">
+          {/* Profile strip */}
+          <div className="shrink-0 border-b px-6 py-4">
+            <div className="flex items-center gap-4">
+              <Avatar className="size-11">
+                <AvatarFallback className="bg-muted font-medium text-base text-muted-foreground">
+                  {getInitials(lead.name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2.5">
+                  <h1 className="truncate font-semibold text-lg tracking-tight">
+                    {lead.name}
+                  </h1>
+                  <StatusBadge status={lead.status} />
+                </div>
+                <p className="truncate text-muted-foreground text-sm">
+                  {[lead.title, lead.company].filter(Boolean).join(" at ") ||
+                    lead.email}
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Contact info chips */}
-          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-            <a
-              className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
-              href={`mailto:${lead.email}`}
-            >
-              <HugeiconsIcon icon={Mail01Icon} size={13} strokeWidth={1.5} />
-              {lead.email}
-            </a>
-            {lead.phone && (
-              <a
-                className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
-                href={`tel:${lead.phone}`}
-              >
-                <HugeiconsIcon icon={CallIcon} size={13} strokeWidth={1.5} />
-                {lead.phone}
-              </a>
-            )}
-            {lead.website && (
-              <a
-                className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
-                href={
-                  lead.website.startsWith("http")
-                    ? lead.website
-                    : `https://${lead.website}`
-                }
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                <HugeiconsIcon icon={Globe02Icon} size={13} strokeWidth={1.5} />
-                {formatWebsite(lead.website)}
-              </a>
-            )}
-            <span className="text-muted-foreground/60">·</span>
-            <span className="text-muted-foreground text-xs">
-              {SOURCE_LABELS[lead.source] ?? lead.source}
-            </span>
-            {lead.value > 0 && (
-              <>
-                <span className="text-muted-foreground/60">·</span>
-                <span className="font-mono text-sm">
-                  ${(lead.value / 100).toLocaleString()}
-                </span>
-              </>
-            )}
-            {lead.plan && (
-              <>
-                <span className="text-muted-foreground/60">·</span>
-                <span className="rounded-sm bg-emerald-500/15 px-1.5 py-0.5 font-medium text-[10px] text-emerald-400 uppercase tracking-wider">
-                  {lead.plan}
-                </span>
-              </>
-            )}
-            <span className="text-muted-foreground/60">·</span>
-            <span className="text-muted-foreground text-xs">
-              Added {format(new Date(lead.createdAt), "MMM d, yyyy")}
-            </span>
-            {lead.assignedUser && (
-              <>
-                <span className="text-muted-foreground/60">·</span>
-                <span className="text-muted-foreground text-xs">
-                  {lead.assignedUser.name}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Main content */}
-        <div className="grid gap-0 lg:grid-cols-5">
-          {/* Left — Activity + Notes (3/5) */}
-          <div className="border-r-0 p-5 lg:col-span-3 lg:border-r">
-            {/* Note input */}
-            <div className="mb-5">
+          {/* Note input */}
+          <div className="shrink-0 border-b px-6 py-3">
+            <div className="flex gap-2">
               <Textarea
-                className="min-h-[72px] resize-none"
+                className="min-h-[40px] flex-1 resize-none text-sm"
                 onChange={(e) => setNoteText(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -488,73 +332,220 @@ export function LeadDetailClient({
                     handleAddNote();
                   }
                 }}
-                placeholder="Add a note..."
+                placeholder="Add a note... (⌘ Enter)"
+                rows={1}
                 value={noteText}
               />
-              <div className="mt-1.5 flex items-center justify-between">
-                <span className="text-[10px] text-muted-foreground">
-                  Cmd+Enter to save
-                </span>
-                <Button
-                  disabled={isPending || !noteText.trim()}
-                  onClick={handleAddNote}
-                  size="sm"
-                  variant="outline"
-                >
-                  Add Note
-                </Button>
-              </div>
+              <Button
+                className="shrink-0 self-end"
+                disabled={addNote.isPending || !noteText.trim()}
+                onClick={handleAddNote}
+                size="sm"
+                variant="outline"
+              >
+                Add
+              </Button>
             </div>
+          </div>
 
-            {/* Activity timeline */}
-            <div>
-              <h3 className="mb-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                Activity ({lead.activities.length})
-              </h3>
-              {lead.activities.length === 0 && (
-                <p className="py-8 text-center text-muted-foreground text-xs">
-                  No activity yet
-                </p>
-              )}
-              <div className="space-y-0">
-                {lead.activities.map((a, i) => {
-                  const Icon = ACTIVITY_ICONS[a.type] ?? Note01Icon;
-                  const isLast = i === lead.activities.length - 1;
-                  return (
-                    <div
-                      className={`relative flex gap-3 pb-4 pl-6 ${isLast ? "" : "border-muted-foreground/20 border-l"}`}
-                      key={a.id}
-                      style={{ marginLeft: "11px" }}
-                    >
-                      <div className="absolute top-0 -left-[12px] flex size-6 items-center justify-center rounded-full border bg-background">
-                        <HugeiconsIcon
-                          className="text-muted-foreground"
-                          icon={Icon}
-                          size={12}
-                          strokeWidth={1.5}
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1 pt-0.5">
-                        <p className="text-sm">{a.content}</p>
-                        <p className="mt-0.5 text-muted-foreground text-xs">
-                          {a.user?.name ?? "System"} ·{" "}
-                          {formatDistanceToNow(new Date(a.createdAt), {
-                            addSuffix: true,
-                          })}
-                        </p>
-                      </div>
+          {/* Scrollable activity */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <h3 className="mb-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+              Activity ({lead.activities.length})
+            </h3>
+            {lead.activities.length === 0 && (
+              <p className="py-8 text-center text-muted-foreground text-xs">
+                No activity yet
+              </p>
+            )}
+            <div className="space-y-0">
+              {lead.activities.map((a, i) => {
+                const Icon = ACTIVITY_ICONS[a.type] ?? Note01Icon;
+                const isLast = i === lead.activities.length - 1;
+                return (
+                  <div
+                    className={`relative flex gap-3 pb-4 pl-6 ${isLast ? "" : "border-muted-foreground/20 border-l"}`}
+                    key={a.id}
+                    style={{ marginLeft: "11px" }}
+                  >
+                    <div className="absolute top-0 -left-[12px] flex size-6 items-center justify-center rounded-full border bg-background">
+                      <HugeiconsIcon
+                        className="text-muted-foreground"
+                        icon={Icon}
+                        size={12}
+                        strokeWidth={1.5}
+                      />
                     </div>
-                  );
-                })}
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <p className="text-sm">{a.content}</p>
+                      <p className="mt-0.5 text-muted-foreground text-xs">
+                        {a.user?.name ?? "System"} ·{" "}
+                        {formatDistanceToNow(new Date(a.createdAt), {
+                          addSuffix: true,
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT — Details + Owner + Tasks sidebar */}
+        <div className="flex w-80 shrink-0 flex-col lg:w-96">
+          {/* Details section */}
+          <div className="shrink-0 border-b px-5 py-4">
+            <h3 className="mb-2.5 font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
+              Details
+            </h3>
+            <div className="space-y-2">
+              <DetailRow href={`mailto:${lead.email}`} icon={Mail01Icon}>
+                {lead.email}
+              </DetailRow>
+              {lead.phone && (
+                <DetailRow href={`tel:${lead.phone}`} icon={CallIcon}>
+                  {lead.phone}
+                </DetailRow>
+              )}
+              {lead.website && (
+                <DetailRow
+                  external
+                  href={
+                    lead.website.startsWith("http")
+                      ? lead.website
+                      : `https://${lead.website}`
+                  }
+                  icon={Globe02Icon}
+                >
+                  {formatWebsite(lead.website)}
+                </DetailRow>
+              )}
+              <div className="flex items-center gap-3 text-sm">
+                <span className="w-16 shrink-0 text-muted-foreground text-xs">
+                  Source
+                </span>
+                <span>{SOURCE_LABELS[lead.source] ?? lead.source}</span>
+              </div>
+              {lead.value > 0 && (
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="w-16 shrink-0 text-muted-foreground text-xs">
+                    Value
+                  </span>
+                  <span className="font-mono">{formatCents(lead.value)}</span>
+                </div>
+              )}
+              {lead.plan && (
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="w-16 shrink-0 text-muted-foreground text-xs">
+                    Plan
+                  </span>
+                  <span className="rounded-sm bg-emerald-500/15 px-1.5 py-0.5 font-medium text-[10px] text-emerald-400 uppercase tracking-wider">
+                    {lead.plan}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-3 text-sm">
+                <span className="w-16 shrink-0 text-muted-foreground text-xs">
+                  Added
+                </span>
+                <span className="text-muted-foreground">
+                  {format(new Date(lead.createdAt), "MMM d, yyyy")}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Right — Tasks (2/5) */}
-          <div className="p-5 lg:col-span-2">
-            <div className="flex items-center justify-between">
-              <h3 className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                Tasks ({openTasks.length})
+          {/* Owner section */}
+          <div className="shrink-0 border-b px-5 py-4">
+            <h3 className="mb-2.5 font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
+              Owner
+            </h3>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <button
+                    className="flex w-full items-center gap-3 rounded-md border border-transparent p-2 text-left transition-colors hover:border-border hover:bg-muted/40"
+                    type="button"
+                  />
+                }
+              >
+                {lead.assignedUser ? (
+                  <>
+                    <Avatar className="size-8">
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                        {getInitials(lead.assignedUser.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-sm">
+                        {lead.assignedUser.name}
+                      </p>
+                      <p className="truncate text-muted-foreground text-xs">
+                        {lead.assignedUser.email}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex size-8 items-center justify-center rounded-full border border-muted-foreground/30 border-dashed">
+                      <HugeiconsIcon
+                        className="text-muted-foreground/50"
+                        icon={UserIcon}
+                        size={14}
+                        strokeWidth={1.5}
+                      />
+                    </div>
+                    <span className="text-muted-foreground text-sm">
+                      Click to assign
+                    </span>
+                  </>
+                )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64">
+                {teamMembers.map((m: TeamMember) => (
+                  <DropdownMenuItem
+                    key={m.id}
+                    onClick={() =>
+                      assignLead.mutate({ leadId: id, assignedTo: m.id })
+                    }
+                  >
+                    <Avatar className="size-6">
+                      <AvatarFallback className="bg-muted text-[9px] text-muted-foreground">
+                        {getInitials(m.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm">{m.name}</p>
+                    </div>
+                    {lead.assignedTo === m.id && (
+                      <span className="shrink-0 rounded-sm bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                        current
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+                {lead.assignedTo && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() =>
+                        assignLead.mutate({ leadId: id, assignedTo: null })
+                      }
+                    >
+                      Unassign
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Scrollable Tasks section */}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex shrink-0 items-center justify-between px-5 pt-4 pb-2">
+              <h3 className="font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
+                Tasks ({openTasks.length} open)
               </h3>
               <Button
                 onClick={() => {
@@ -570,9 +561,8 @@ export function LeadDetailClient({
               </Button>
             </div>
 
-            {/* Add task form */}
             {showAddTask && (
-              <div className="mt-3 space-y-2 rounded-md border p-3">
+              <div className="mx-5 mb-3 shrink-0 space-y-2 rounded-md border p-3">
                 <Input
                   autoFocus
                   onChange={(e) => setNewTaskTitle(e.target.value)}
@@ -587,10 +577,10 @@ export function LeadDetailClient({
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <Select
-                    onValueChange={handleTaskTypeChange}
+                    onValueChange={(v) => v && setNewTaskType(v)}
                     value={newTaskType}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-full text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -607,66 +597,98 @@ export function LeadDetailClient({
                     value={newTaskDue}
                   />
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground">
-                    Enter to save
-                  </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <Select
+                    onValueChange={(v) => v && setNewTaskAssignee(v)}
+                    value={newTaskAssignee}
+                  >
+                    <SelectTrigger className="w-full text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_self">Myself</SelectItem>
+                      {(teamMembers as TeamMember[]).map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    onValueChange={(v) => v && setNewTaskRecurrence(v)}
+                    value={newTaskRecurrence}
+                  >
+                    <SelectTrigger className="w-full text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">One-time</SelectItem>
+                      {TASK_RECURRENCES.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {RECURRENCE_LABELS[r]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex justify-end">
                   <Button
-                    disabled={isPending}
+                    disabled={createTask.isPending}
                     onClick={handleAddTask}
                     size="sm"
                   >
-                    Add
+                    Add Task
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* Open tasks */}
-            <div className="mt-3 space-y-1">
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
               {openTasks.length === 0 && !showAddTask && (
                 <p className="py-6 text-center text-muted-foreground text-xs">
                   No open tasks
                 </p>
               )}
-              {openTasks.map((t) => (
-                <TaskRow
-                  key={t.id}
-                  onDelete={handleDeleteTask}
-                  onReschedule={handleRescheduleTask}
-                  onToggle={handleToggleTask}
-                  task={t}
-                />
-              ))}
-            </div>
-
-            {/* Completed tasks */}
-            {completedTasks.length > 0 && (
-              <div className="mt-5">
-                <h3 className="mb-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                  Completed ({completedTasks.length})
-                </h3>
-                <div className="space-y-1">
-                  {completedTasks.map((t) => (
-                    <TaskRow
-                      key={t.id}
-                      onDelete={handleDeleteTask}
-                      onReschedule={handleRescheduleTask}
-                      onToggle={handleToggleTask}
-                      task={t}
-                    />
-                  ))}
-                </div>
+              <div className="space-y-0.5">
+                {openTasks.map((t) => (
+                  <TaskRow
+                    key={t.id}
+                    leadId={id}
+                    onDelete={deleteTaskMut}
+                    onReschedule={rescheduleTask}
+                    onToggle={toggleTask}
+                    task={t}
+                  />
+                ))}
               </div>
-            )}
+
+              {completedTasks.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-1 px-2 font-medium text-[10px] text-muted-foreground uppercase tracking-wider">
+                    Completed ({completedTasks.length})
+                  </p>
+                  <div className="space-y-0.5">
+                    {completedTasks.map((t) => (
+                      <TaskRow
+                        key={t.id}
+                        leadId={id}
+                        onDelete={deleteTaskMut}
+                        onReschedule={rescheduleTask}
+                        onToggle={toggleTask}
+                        task={t}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Dialogs */}
       <LeadFormDialog lead={lead} onOpenChange={setShowEdit} open={showEdit} />
       <EmailComposeDialog
-        leadId={lead.id}
+        leadId={id}
         leadName={lead.name}
         onOpenChange={setShowEmail}
         open={showEmail}
@@ -693,12 +715,41 @@ export function LeadDetailClient({
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
+  );
+}
+
+function DetailRow({
+  icon,
+  href,
+  external,
+  children,
+}: {
+  icon: typeof Mail01Icon;
+  href: string;
+  external?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <a
+      className="flex items-center gap-3 text-muted-foreground text-sm transition-colors hover:text-foreground"
+      href={href}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+    >
+      <HugeiconsIcon
+        className="shrink-0"
+        icon={icon}
+        size={14}
+        strokeWidth={1.5}
+      />
+      <span className="truncate">{children}</span>
+    </a>
   );
 }
 
 function TaskRow({
   task: t,
+  leadId,
   onToggle,
   onDelete,
   onReschedule,
@@ -710,40 +761,32 @@ function TaskRow({
     completedAt: Date | null;
     type: string;
   };
-  onToggle: (id: string, wasCompleted: boolean) => void;
-  onDelete: (id: string) => void;
-  onReschedule: (id: string, days: number) => void;
+  leadId: string;
+  onToggle: ReturnType<typeof useToggleTask>;
+  onDelete: ReturnType<typeof useDeleteTask>;
+  onReschedule: ReturnType<typeof useRescheduleTask>;
 }) {
   const isComplete = !!t.completedAt;
   const overdue = !isComplete && isPast(new Date(t.dueAt));
 
   return (
-    <div className="group flex items-start gap-2.5 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
-      <button
-        className={`mt-0.5 flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-[4px] border transition-colors ${
-          isComplete
-            ? "border-primary bg-primary text-primary-foreground"
-            : "border-input hover:border-primary/50 hover:bg-primary/10"
-        }`}
-        onClick={() => onToggle(t.id, isComplete)}
-        type="button"
-      >
-        {isComplete && (
-          <HugeiconsIcon icon={Tick01Icon} size={10} strokeWidth={2.5} />
-        )}
-      </button>
+    <div className="group flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/40">
+      <TaskCheckbox
+        checked={isComplete}
+        onChange={() => onToggle.mutate({ id: t.id, isComplete, leadId })}
+      />
       <div className="min-w-0 flex-1">
         <p
           className={`text-sm leading-tight ${isComplete ? "text-muted-foreground line-through" : ""}`}
         >
           {t.title}
         </p>
-        <div className="mt-1 flex items-center gap-1.5">
+        <div className="mt-0.5 flex items-center gap-1.5">
           <span className="rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground uppercase">
             {TASK_TYPE_LABELS[t.type] ?? t.type}
           </span>
           <span
-            className={`text-xs ${overdue ? "text-red-400" : "text-muted-foreground"}`}
+            className={`text-[11px] ${overdue ? "text-red-400" : "text-muted-foreground"}`}
           >
             {format(new Date(t.dueAt), "MMM d")}
             {overdue && " · overdue"}
@@ -753,7 +796,7 @@ function TaskRow({
       <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
         {!isComplete && (
           <Button
-            onClick={() => onReschedule(t.id, 1)}
+            onClick={() => onReschedule.mutate({ id: t.id, days: 1, leadId })}
             size="icon-sm"
             title="+1 day"
             variant="ghost"
@@ -774,7 +817,11 @@ function TaskRow({
           <DropdownMenuContent align="end">
             {!isComplete && (
               <>
-                <DropdownMenuItem onClick={() => onReschedule(t.id, 1)}>
+                <DropdownMenuItem
+                  onClick={() =>
+                    onReschedule.mutate({ id: t.id, days: 1, leadId })
+                  }
+                >
                   <HugeiconsIcon
                     icon={Calendar01Icon}
                     size={14}
@@ -782,7 +829,11 @@ function TaskRow({
                   />
                   Tomorrow
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onReschedule(t.id, 3)}>
+                <DropdownMenuItem
+                  onClick={() =>
+                    onReschedule.mutate({ id: t.id, days: 3, leadId })
+                  }
+                >
                   <HugeiconsIcon
                     icon={Calendar01Icon}
                     size={14}
@@ -790,7 +841,11 @@ function TaskRow({
                   />
                   +3 days
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onReschedule(t.id, 7)}>
+                <DropdownMenuItem
+                  onClick={() =>
+                    onReschedule.mutate({ id: t.id, days: 7, leadId })
+                  }
+                >
                   <HugeiconsIcon
                     icon={Calendar01Icon}
                     size={14}
@@ -802,7 +857,7 @@ function TaskRow({
               </>
             )}
             <DropdownMenuItem
-              onClick={() => onDelete(t.id)}
+              onClick={() => onDelete.mutate({ id: t.id, leadId })}
               variant="destructive"
             >
               <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={1.5} />

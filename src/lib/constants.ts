@@ -64,3 +64,33 @@ export const SOURCE_LABELS: Record<string, string> = {
   cold_email: "Cold Email",
   other: "Other",
 };
+
+export const TASK_TYPE_LABELS: Record<string, string> = {
+  follow_up: "Follow-up",
+  demo: "Demo",
+  call: "Call",
+  email: "Email",
+  other: "Other",
+};
+
+export const RESCHEDULE_LABELS: Record<number, string> = {
+  1: "tomorrow",
+  3: "in 3 days",
+  7: "in 1 week",
+};
+
+export const TASK_RECURRENCES = [
+  "daily",
+  "weekly",
+  "biweekly",
+  "monthly",
+] as const;
+
+export type TaskRecurrence = (typeof TASK_RECURRENCES)[number];
+
+export const RECURRENCE_LABELS: Record<string, string> = {
+  daily: "Daily",
+  weekly: "Weekly",
+  biweekly: "Biweekly",
+  monthly: "Monthly",
+};

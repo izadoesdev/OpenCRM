@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,8 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createLead, updateLead } from "@/lib/actions/leads";
 import { LEAD_SOURCES, SOURCE_LABELS } from "@/lib/constants";
+import { useCreateLead, useUpdateLead } from "@/lib/queries";
 
 const COMMON_TITLES = [
   "CEO",
@@ -49,10 +49,6 @@ interface LeadData {
   website?: string | null;
 }
 
-function getSubmitLabel(isEdit: boolean): string {
-  return isEdit ? "Save Changes" : "Add Lead";
-}
-
 export function LeadFormDialog({
   open,
   onOpenChange,
@@ -63,7 +59,9 @@ export function LeadFormDialog({
   lead?: LeadData;
 }) {
   const isEdit = !!lead?.id;
-  const [isPending, startTransition] = useTransition();
+  const createLead = useCreateLead();
+  const updateLead = useUpdateLead();
+  const isPending = createLead.isPending || updateLead.isPending;
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -89,49 +87,35 @@ export function LeadFormDialog({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    startTransition(async () => {
-      const cents = Math.min(
-        Math.round((Number.parseFloat(valueDollars) || 0) * 100),
-        2_147_483_647
+    const cents = Math.min(
+      Math.round((Number.parseFloat(valueDollars) || 0) * 100),
+      2_147_483_647
+    );
+    const data = {
+      name,
+      email,
+      company: company || undefined,
+      title: title || undefined,
+      phone: phone || undefined,
+      website: website || undefined,
+      source,
+      value: cents,
+    };
+
+    if (isEdit && lead?.id) {
+      updateLead.mutate(
+        { id: lead.id, data },
+        { onSuccess: () => onOpenChange(false) }
       );
-      const data = {
-        name,
-        email,
-        company: company || undefined,
-        title: title || undefined,
-        phone: phone || undefined,
-        website: website || undefined,
-        source,
-        value: cents,
-      };
-
-      if (isEdit && lead?.id) {
-        await updateLead(lead.id, data);
-      } else {
-        await createLead(data);
-      }
-      onOpenChange(false);
-    });
-  }
-
-  function handleSourceChange(v: string | null) {
-    if (v) {
-      setSource(v);
-    }
-  }
-
-  function handleTitleSelect(v: string | null) {
-    if (!v) {
-      return;
-    }
-    if (v === "__custom__") {
-      setTitle("");
     } else {
-      setTitle(v);
+      createLead.mutate(data, {
+        onSuccess: () => onOpenChange(false),
+      });
     }
   }
 
   const titleMatchesPreset = COMMON_TITLES.includes(title);
+  const submitLabel = isEdit ? "Save Changes" : "Add Lead";
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
@@ -205,7 +189,16 @@ export function LeadFormDialog({
               </label>
               {titleMatchesPreset || !title ? (
                 <Select
-                  onValueChange={handleTitleSelect}
+                  onValueChange={(v) => {
+                    if (!v) {
+                      return;
+                    }
+                    if (v === "__custom__") {
+                      setTitle("");
+                    } else {
+                      setTitle(v);
+                    }
+                  }}
                   value={title || undefined}
                 >
                   <SelectTrigger className="w-full">
@@ -270,7 +263,7 @@ export function LeadFormDialog({
             >
               Source
             </label>
-            <Select onValueChange={handleSourceChange} value={source}>
+            <Select onValueChange={(v) => v && setSource(v)} value={source}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -311,7 +304,7 @@ export function LeadFormDialog({
 
           <DialogFooter>
             <Button disabled={isPending} type="submit">
-              {isPending ? "Saving..." : getSubmitLabel(isEdit)}
+              {isPending ? "Saving..." : submitLabel}
             </Button>
           </DialogFooter>
         </form>

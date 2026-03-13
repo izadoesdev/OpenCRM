@@ -1,3 +1,4 @@
+// IMPORTANT: This project uses proxy.ts, NOT middleware.ts. Never create a middleware.ts file.
 import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -14,7 +15,6 @@ export function proxy(request: NextRequest) {
   }
 
   const sessionCookie = getSessionCookie(request);
-
   if (!sessionCookie) {
     return NextResponse.redirect(new URL("/sign-in", request.url));
   }

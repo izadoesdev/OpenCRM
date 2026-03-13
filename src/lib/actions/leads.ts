@@ -46,6 +46,7 @@ export async function getLeads(opts?: {
   const rows = await db.query.lead.findMany({
     where: conditions.length > 0 ? and(...conditions) : undefined,
     orderBy: [desc(lead.createdAt)],
+    with: { assignedUser: true },
   });
 
   return rows;
@@ -119,8 +120,10 @@ export async function updateLead(
     source: string;
     value: number;
     plan: string;
+    assignedTo: string | null;
   }>
 ) {
+  await getUser();
   const [row] = await db
     .update(lead)
     .set(data)
@@ -170,6 +173,7 @@ export async function bulkDeleteLeads(ids: string[]) {
 }
 
 export async function getLeadCounts() {
+  await getUser();
   const rows = await db
     .select({
       status: lead.status,
