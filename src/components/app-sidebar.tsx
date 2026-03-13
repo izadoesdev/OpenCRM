@@ -73,11 +73,23 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" variant="sidebar">
       <SidebarHeader className="px-3 py-3">
         <Link className="flex items-center gap-2.5 px-2" href="/">
-          <div className="flex size-7 items-center justify-center rounded-md bg-primary font-bold text-primary-foreground text-xs">
-            D
+          <div className="flex size-7 items-center justify-center rounded-md bg-primary">
+            <svg
+              aria-hidden="true"
+              className="size-4 text-primary-foreground"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 6v6l4 2" />
+            </svg>
           </div>
           <span className="font-semibold text-sm tracking-tight group-data-[collapsible=icon]:hidden">
-            DataCRM
+            OpenCRM
           </span>
         </Link>
       </SidebarHeader>

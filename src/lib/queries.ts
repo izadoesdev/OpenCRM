@@ -24,18 +24,23 @@ import {
 } from "@/lib/actions/leads";
 import { addNote, changeLeadStatus, logOutreach } from "@/lib/actions/status";
 import {
+  addTaskAttendees,
   completeTask,
   createTask,
   deleteTask,
   getLeadTasks,
   getTasks,
   rescheduleTask,
+  rescheduleTaskTo,
   uncompleteTask,
   updateTask,
 } from "@/lib/actions/tasks";
 import { getTeamMembers } from "@/lib/actions/team";
 import { RESCHEDULE_LABELS, STATUS_LABELS } from "@/lib/constants";
-import { getUpcomingCalendarEvents } from "./actions/calendar";
+import {
+  getCalendarEvent,
+  getUpcomingCalendarEvents,
+} from "./actions/calendar";
 import { getLeadEmails } from "./actions/gmail";
 import { checkGoogleConnection } from "./google";
 
@@ -52,6 +57,7 @@ export const queryKeys = {
   emailTemplates: ["email-templates"] as const,
   team: ["team"] as const,
   calendarEvents: ["calendar-events"] as const,
+  calendarEvent: (id: string) => ["calendar-event", id] as const,
   leadEmails: (email: string) => ["lead-emails", email] as const,
   googleConnection: ["google-connection"] as const,
 };
@@ -132,6 +138,15 @@ export function useGoogleConnection() {
     queryKey: queryKeys.googleConnection,
     queryFn: () => checkGoogleConnection(),
     staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useCalendarEvent(eventId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.calendarEvent(eventId ?? ""),
+    queryFn: () => getCalendarEvent(eventId ?? ""),
+    enabled: !!eventId,
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -418,12 +433,14 @@ export function useToggleTask() {
     },
     onSuccess: (_, { isComplete, leadId }) => {
       inv.tasks(leadId);
+      qc.invalidateQueries({ queryKey: queryKeys.calendarEvents });
       toast.success(isComplete ? "Task reopened" : "Task completed");
     },
   });
 }
 
 export function useUpdateTask() {
+  const qc = useQueryClient();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: ({
@@ -434,9 +451,22 @@ export function useUpdateTask() {
       data: Parameters<typeof updateTask>[1];
       leadId?: string | null;
     }) => updateTask(id, data),
-    onSuccess: (_, { leadId }) => {
+    onSuccess: (result, { leadId }) => {
       inv.tasks(leadId);
-      toast.success("Task updated");
+      qc.invalidateQueries({ queryKey: queryKeys.calendarEvents });
+
+      const ops = result?.calendarOps ?? [];
+      if (ops.includes("calendar_cancelled")) {
+        toast.success("Task updated · calendar event cancelled");
+      } else if (ops.includes("calendar_cancel_failed")) {
+        toast.success("Task updated · failed to cancel calendar event");
+      } else if (ops.includes("calendar_updated")) {
+        toast.success("Task updated · calendar synced");
+      } else if (ops.includes("calendar_update_failed")) {
+        toast.success("Task updated · calendar sync failed");
+      } else {
+        toast.success("Task updated");
+      }
     },
     onError: () => toast.error("Failed to update task"),
   });
@@ -461,15 +491,63 @@ export function useRescheduleTask() {
   });
 }
 
+export function useRescheduleTaskTo() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: ({
+      id,
+      date,
+    }: {
+      id: string;
+      date: Date;
+      leadId?: string | null;
+    }) => rescheduleTaskTo(id, date),
+    onSuccess: (_, { leadId }) => {
+      inv.tasks(leadId);
+      toast.success("Rescheduled");
+    },
+    onError: () => toast.error("Failed to reschedule task"),
+  });
+}
+
 export function useDeleteTask() {
   const inv = useInvalidate();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id }: { id: string; leadId?: string | null }) =>
       deleteTask(id),
     onSuccess: (_, { leadId }) => {
       inv.tasks(leadId);
+      qc.invalidateQueries({ queryKey: queryKeys.calendarEvents });
       toast.success("Task deleted");
     },
     onError: () => toast.error("Failed to delete task"),
+  });
+}
+
+export function useAddTaskAttendees() {
+  const qc = useQueryClient();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: ({
+      id,
+      emails,
+    }: {
+      id: string;
+      emails: string[];
+      calendarEventId?: string | null;
+      leadId?: string | null;
+    }) => addTaskAttendees(id, emails),
+    onSuccess: (_, { leadId, calendarEventId }) => {
+      inv.tasks(leadId);
+      if (calendarEventId) {
+        qc.invalidateQueries({
+          queryKey: queryKeys.calendarEvent(calendarEventId),
+        });
+      }
+      qc.invalidateQueries({ queryKey: queryKeys.calendarEvents });
+      toast.success("Invite sent");
+    },
+    onError: () => toast.error("Failed to add attendees"),
   });
 }

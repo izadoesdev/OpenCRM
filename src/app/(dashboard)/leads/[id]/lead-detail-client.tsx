@@ -3,11 +3,14 @@
 import {
   Add01Icon,
   ArrowLeft02Icon,
-  Calendar01Icon,
   CallIcon,
+  Cancel01Icon,
+  CheckmarkCircle01Icon,
+  ComputerVideoCallIcon,
   Delete02Icon,
   Edit02Icon,
   Globe02Icon,
+  HelpCircleIcon,
   Link01Icon,
   LinkSquare01Icon,
   Mail01Icon,
@@ -68,7 +71,9 @@ import {
 import dayjs from "@/lib/dayjs";
 import {
   useAddNote,
+  useAddTaskAttendees,
   useAssignLead,
+  useCalendarEvent,
   useChangeLeadStatus,
   useCreateTask,
   useDeleteLead,
@@ -78,9 +83,9 @@ import {
   useLead,
   useLeadEmails,
   useLogOutreach,
-  useRescheduleTask,
   useTeamMembers,
   useToggleTask,
+  useUpdateTask,
 } from "@/lib/queries";
 import { formatCents, formatWebsite, getInitials } from "@/lib/utils";
 
@@ -100,6 +105,7 @@ const ACTIVITY_ICONS: Record<string, typeof Mail01Icon> = {
   status_change: Task01Icon,
 };
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: lead detail has many UI sections
 export function LeadDetailClient({ leadId }: { leadId: string }) {
   const router = useRouter();
   const { data: lead, isLoading, isError } = useLead(leadId);
@@ -109,10 +115,6 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
   const addNote = useAddNote();
   const logOutreach = useLogOutreach();
   const deleteLeadMut = useDeleteLead();
-  const createTask = useCreateTask();
-  const toggleTask = useToggleTask();
-  const deleteTaskMut = useDeleteTask();
-  const rescheduleTask = useRescheduleTask();
   const assignLead = useAssignLead();
   const { data: teamMembers = [] as TeamMember[] } = useTeamMembers();
   const { data: gConn } = useGoogleConnection();
@@ -122,15 +124,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
   const [showEmail, setShowEmail] = useState(false);
   const [leftTab, setLeftTab] = useState<"activity" | "emails">("activity");
   const [noteText, setNoteText] = useState("");
-  const [showAddTask, setShowAddTask] = useState(false);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newTaskDue, setNewTaskDue] = useState<Date | null>(null);
-  const [newTaskType, setNewTaskType] = useState("follow_up");
-  const [newTaskAssignee, setNewTaskAssignee] = useState<string>("_self");
-  const [newTaskRecurrence, setNewTaskRecurrence] = useState<string>("none");
-  const [newTaskMeetingLink, setNewTaskMeetingLink] = useState("");
-  const [newTaskSyncCalendar, setNewTaskSyncCalendar] = useState(true);
 
   if (isLoading) {
     return null;
@@ -154,8 +148,6 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
 
   const id = lead.id;
   const nextStatuses = LEAD_STATUSES.filter((s) => s !== lead.status);
-  const openTasks = lead.tasks.filter((t) => !t.completedAt);
-  const completedTasks = lead.tasks.filter((t) => !!t.completedAt);
 
   function handleStatusChange(status: string) {
     if (status === "converted") {
@@ -176,31 +168,6 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
     }
     addNote.mutate({ leadId: id, content: noteText });
     setNoteText("");
-  }
-
-  function handleAddTask() {
-    if (!(newTaskTitle.trim() && newTaskDue)) {
-      return;
-    }
-    createTask.mutate({
-      leadId: id,
-      title: newTaskTitle,
-      dueAt: newTaskDue,
-      type: newTaskType,
-      userId: newTaskAssignee === "_self" ? undefined : newTaskAssignee,
-      recurrence: newTaskRecurrence === "none" ? null : newTaskRecurrence,
-      meetingLink: newTaskMeetingLink.trim() || null,
-      syncToCalendar:
-        newTaskSyncCalendar &&
-        (newTaskType === "meeting" || newTaskType === "demo"),
-    });
-    setNewTaskTitle("");
-    setNewTaskDue(null);
-    setNewTaskType("follow_up");
-    setNewTaskAssignee("_self");
-    setNewTaskRecurrence("none");
-    setNewTaskMeetingLink("");
-    setShowAddTask(false);
   }
 
   return (
@@ -614,188 +581,11 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
             </DropdownMenu>
           </div>
 
-          {/* Scrollable Tasks section */}
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex shrink-0 items-center justify-between px-5 pt-4 pb-2">
-              <h3 className="font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
-                Tasks ({openTasks.length} open)
-              </h3>
-              <Button
-                onClick={() => {
-                  setShowAddTask(!showAddTask);
-                  if (!showAddTask) {
-                    setNewTaskDue(null);
-                  }
-                }}
-                size="icon-sm"
-                variant="ghost"
-              >
-                <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-              </Button>
-            </div>
-
-            {showAddTask && (
-              <div className="mx-5 mb-3 shrink-0 space-y-2 rounded-md border p-3">
-                <Input
-                  autoFocus
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddTask();
-                    }
-                  }}
-                  placeholder="Task title..."
-                  value={newTaskTitle}
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <TaskTypePicker
-                    className="w-full"
-                    onChange={setNewTaskType}
-                    value={newTaskType}
-                  />
-                  <DateTimePicker onChange={setNewTaskDue} value={newTaskDue} />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Select
-                    onValueChange={(v) => v && setNewTaskAssignee(v)}
-                    value={newTaskAssignee}
-                  >
-                    <SelectTrigger className="w-full text-xs">
-                      <HugeiconsIcon
-                        className="mr-1 shrink-0 text-muted-foreground"
-                        icon={UserIcon}
-                        size={12}
-                        strokeWidth={1.5}
-                      />
-                      <span className="flex-1 truncate text-left">
-                        {newTaskAssignee === "_self"
-                          ? "Myself"
-                          : ((teamMembers as TeamMember[]).find(
-                              (m) => m.id === newTaskAssignee
-                            )?.name ?? "Select...")}
-                      </span>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_self">Myself</SelectItem>
-                      {(teamMembers as TeamMember[]).map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    onValueChange={(v) => v && setNewTaskRecurrence(v)}
-                    value={newTaskRecurrence}
-                  >
-                    <SelectTrigger className="w-full text-xs">
-                      <HugeiconsIcon
-                        className="mr-1 shrink-0 text-muted-foreground"
-                        icon={RepeatIcon}
-                        size={12}
-                        strokeWidth={1.5}
-                      />
-                      <span className="flex-1 truncate text-left">
-                        {newTaskRecurrence === "none"
-                          ? "One-time"
-                          : (RECURRENCE_LABELS[newTaskRecurrence] ??
-                            newTaskRecurrence)}
-                      </span>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">One-time</SelectItem>
-                      {TASK_RECURRENCES.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {RECURRENCE_LABELS[r]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {(newTaskType === "meeting" || newTaskType === "demo") && (
-                  <>
-                    <Input
-                      onChange={(e) => setNewTaskMeetingLink(e.target.value)}
-                      placeholder="Meeting link (or leave empty to auto-generate Meet)"
-                      value={newTaskMeetingLink}
-                    />
-                    <label className="flex items-center gap-2 text-muted-foreground text-xs">
-                      <input
-                        checked={newTaskSyncCalendar}
-                        className="rounded border"
-                        onChange={(e) =>
-                          setNewTaskSyncCalendar(e.target.checked)
-                        }
-                        type="checkbox"
-                      />
-                      Create Google Calendar event with Meet link
-                    </label>
-                  </>
-                )}
-                <div className="flex justify-end gap-2">
-                  <Button
-                    onClick={() => setShowAddTask(false)}
-                    size="sm"
-                    variant="ghost"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    disabled={
-                      createTask.isPending ||
-                      !newTaskTitle.trim() ||
-                      !newTaskDue
-                    }
-                    onClick={handleAddTask}
-                    size="sm"
-                  >
-                    Add Task
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-              {openTasks.length === 0 && !showAddTask && (
-                <p className="py-6 text-center text-muted-foreground text-xs">
-                  No open tasks
-                </p>
-              )}
-              <div className="space-y-0.5">
-                {openTasks.map((t) => (
-                  <TaskRow
-                    key={t.id}
-                    leadId={id}
-                    onDelete={deleteTaskMut}
-                    onReschedule={rescheduleTask}
-                    onToggle={toggleTask}
-                    task={t}
-                  />
-                ))}
-              </div>
-
-              {completedTasks.length > 0 && (
-                <div className="mt-4">
-                  <p className="mb-1 px-2 font-medium text-[10px] text-muted-foreground uppercase tracking-wider">
-                    Completed ({completedTasks.length})
-                  </p>
-                  <div className="space-y-0.5">
-                    {completedTasks.map((t) => (
-                      <TaskRow
-                        key={t.id}
-                        leadId={id}
-                        onDelete={deleteTaskMut}
-                        onReschedule={rescheduleTask}
-                        onToggle={toggleTask}
-                        task={t}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <LeadTasksSidebar
+            leadId={id}
+            tasks={lead.tasks}
+            teamMembers={teamMembers as TeamMember[]}
+          />
         </div>
       </div>
 
@@ -860,138 +650,707 @@ function DetailRow({
   );
 }
 
-function TaskRow({
+// ---------------------------------------------------------------------------
+// Tasks sidebar for lead detail
+// ---------------------------------------------------------------------------
+interface LeadTask {
+  calendarEventId: string | null;
+  completedAt: Date | null;
+  description: string | null;
+  dueAt: Date;
+  id: string;
+  meetingLink: string | null;
+  recurrence: string | null;
+  title: string;
+  type: string;
+  user: { id: string; name: string } | null;
+}
+
+function LeadTasksSidebar({
+  leadId,
+  tasks,
+  teamMembers,
+}: {
+  leadId: string;
+  tasks: LeadTask[];
+  teamMembers: TeamMember[];
+}) {
+  const openTasks = tasks.filter((t) => !t.completedAt);
+  const completedTasks = tasks.filter((t) => !!t.completedAt);
+  const createTask = useCreateTask();
+  const toggleTask = useToggleTask();
+  const deleteTaskMut = useDeleteTask();
+
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDue, setNewTaskDue] = useState<Date | null>(null);
+  const [newTaskType, setNewTaskType] = useState("follow_up");
+  const [newTaskAssignee, setNewTaskAssignee] = useState<string>("_self");
+  const [newTaskRecurrence, setNewTaskRecurrence] = useState<string>("none");
+  const [newTaskMeetingLink, setNewTaskMeetingLink] = useState("");
+  const [newTaskSyncCalendar, setNewTaskSyncCalendar] = useState(true);
+
+  function handleAddTask() {
+    if (!(newTaskTitle.trim() && newTaskDue)) {
+      return;
+    }
+    const isMeetingType = newTaskType === "meeting" || newTaskType === "demo";
+    createTask.mutate({
+      leadId,
+      title: newTaskTitle,
+      dueAt: newTaskDue,
+      type: newTaskType,
+      userId: newTaskAssignee === "_self" ? undefined : newTaskAssignee,
+      recurrence: newTaskRecurrence === "none" ? null : newTaskRecurrence,
+      meetingLink: newTaskMeetingLink.trim() || null,
+      syncToCalendar: newTaskSyncCalendar && isMeetingType,
+    });
+    setNewTaskTitle("");
+    setNewTaskDue(null);
+    setNewTaskType("follow_up");
+    setNewTaskAssignee("_self");
+    setNewTaskRecurrence("none");
+    setNewTaskMeetingLink("");
+    setShowAddTask(false);
+  }
+
+  const showMeetingFields = newTaskType === "meeting" || newTaskType === "demo";
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center justify-between px-5 pt-4 pb-2">
+        <h3 className="font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
+          Tasks ({openTasks.length} open)
+        </h3>
+        <Button
+          onClick={() => {
+            setShowAddTask(!showAddTask);
+            if (!showAddTask) {
+              setNewTaskDue(null);
+            }
+          }}
+          size="icon-sm"
+          variant="ghost"
+        >
+          <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+        </Button>
+      </div>
+
+      {showAddTask && (
+        <div className="mx-5 mb-3 shrink-0 space-y-2 rounded-md border p-3">
+          <Input
+            autoFocus
+            onChange={(e) => setNewTaskTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAddTask();
+              }
+            }}
+            placeholder="Task title..."
+            value={newTaskTitle}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <TaskTypePicker
+              className="w-full"
+              onChange={setNewTaskType}
+              value={newTaskType}
+            />
+            <DateTimePicker onChange={setNewTaskDue} value={newTaskDue} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Select
+              onValueChange={(v) => v && setNewTaskAssignee(v)}
+              value={newTaskAssignee}
+            >
+              <SelectTrigger className="w-full text-xs">
+                <HugeiconsIcon
+                  className="mr-1 shrink-0 text-muted-foreground"
+                  icon={UserIcon}
+                  size={12}
+                  strokeWidth={1.5}
+                />
+                <span className="flex-1 truncate text-left">
+                  {newTaskAssignee === "_self"
+                    ? "Myself"
+                    : (teamMembers.find((m) => m.id === newTaskAssignee)
+                        ?.name ?? "Select...")}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_self">Myself</SelectItem>
+                {teamMembers.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              onValueChange={(v) => v && setNewTaskRecurrence(v)}
+              value={newTaskRecurrence}
+            >
+              <SelectTrigger className="w-full text-xs">
+                <HugeiconsIcon
+                  className="mr-1 shrink-0 text-muted-foreground"
+                  icon={RepeatIcon}
+                  size={12}
+                  strokeWidth={1.5}
+                />
+                <span className="flex-1 truncate text-left">
+                  {newTaskRecurrence === "none"
+                    ? "One-time"
+                    : (RECURRENCE_LABELS[newTaskRecurrence] ??
+                      newTaskRecurrence)}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">One-time</SelectItem>
+                {TASK_RECURRENCES.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {RECURRENCE_LABELS[r]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {showMeetingFields && (
+            <>
+              <Input
+                onChange={(e) => setNewTaskMeetingLink(e.target.value)}
+                placeholder="Meeting link (or leave empty for Meet)"
+                value={newTaskMeetingLink}
+              />
+              <label className="flex items-center gap-2 text-muted-foreground text-xs">
+                <input
+                  checked={newTaskSyncCalendar}
+                  className="rounded border"
+                  onChange={(e) => setNewTaskSyncCalendar(e.target.checked)}
+                  type="checkbox"
+                />
+                Create Google Calendar event with Meet link
+              </label>
+            </>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => setShowAddTask(false)}
+              size="sm"
+              variant="ghost"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                createTask.isPending || !newTaskTitle.trim() || !newTaskDue
+              }
+              onClick={handleAddTask}
+              size="sm"
+            >
+              Add Task
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+        {openTasks.length === 0 && !showAddTask && (
+          <p className="py-6 text-center text-muted-foreground text-xs">
+            No open tasks
+          </p>
+        )}
+        <div className="space-y-0.5">
+          {openTasks.map((t) => (
+            <LeadTaskRow
+              expanded={expandedTaskId === t.id}
+              key={t.id}
+              leadId={leadId}
+              onDelete={deleteTaskMut}
+              onToggle={toggleTask}
+              onToggleExpand={() =>
+                setExpandedTaskId(expandedTaskId === t.id ? null : t.id)
+              }
+              task={t}
+            />
+          ))}
+        </div>
+
+        {completedTasks.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-1 px-2 font-medium text-[10px] text-muted-foreground uppercase tracking-wider">
+              Completed ({completedTasks.length})
+            </p>
+            <div className="space-y-0.5">
+              {completedTasks.map((t) => (
+                <LeadTaskRow
+                  expanded={expandedTaskId === t.id}
+                  key={t.id}
+                  leadId={leadId}
+                  onDelete={deleteTaskMut}
+                  onToggle={toggleTask}
+                  onToggleExpand={() =>
+                    setExpandedTaskId(expandedTaskId === t.id ? null : t.id)
+                  }
+                  task={t}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RSVP status config for attendees
+// ---------------------------------------------------------------------------
+const RSVP_CONFIG: Record<
+  string,
+  { icon: typeof CheckmarkCircle01Icon; label: string; className: string }
+> = {
+  accepted: {
+    icon: CheckmarkCircle01Icon,
+    label: "Accepted",
+    className: "text-emerald-400",
+  },
+  declined: {
+    icon: Cancel01Icon,
+    label: "Declined",
+    className: "text-red-400",
+  },
+  tentative: {
+    icon: HelpCircleIcon,
+    label: "Maybe",
+    className: "text-amber-400",
+  },
+  needsAction: {
+    icon: Mail01Icon,
+    label: "Pending",
+    className: "text-muted-foreground",
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Meeting detail for lead task — shows attendees + RSVP + invite
+// ---------------------------------------------------------------------------
+function LeadMeetingDetail({
+  calendarEventId,
+  meetingLink,
+  taskId,
+  leadId,
+}: {
+  calendarEventId: string;
+  meetingLink: string | null;
+  taskId: string;
+  leadId: string;
+}) {
+  const { data: event, isLoading } = useCalendarEvent(calendarEventId);
+  const addAttendees = useAddTaskAttendees();
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+
+  function handleInvite() {
+    if (!inviteEmail.trim()) {
+      return;
+    }
+    addAttendees.mutate(
+      {
+        id: taskId,
+        emails: [inviteEmail.trim()],
+        calendarEventId,
+        leadId,
+      },
+      {
+        onSuccess: () => {
+          setInviteEmail("");
+          setShowInvite(false);
+        },
+      }
+    );
+  }
+
+  const attendees = event?.attendees ?? [];
+
+  return (
+    <div className="space-y-2">
+      {meetingLink && (
+        <a
+          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2.5 py-1 text-emerald-400 text-xs transition-colors hover:bg-emerald-500/20"
+          href={meetingLink}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <HugeiconsIcon
+            icon={ComputerVideoCallIcon}
+            size={12}
+            strokeWidth={1.5}
+          />
+          Join Meeting
+        </a>
+      )}
+
+      <div>
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
+            Attendees{!isLoading && ` (${attendees.length})`}
+          </span>
+          <button
+            className="text-[11px] text-primary hover:underline"
+            onClick={() => setShowInvite(!showInvite)}
+            type="button"
+          >
+            + Invite
+          </button>
+        </div>
+
+        {isLoading && <p className="text-muted-foreground text-xs">Loading…</p>}
+        {!isLoading && attendees.length === 0 && (
+          <p className="text-muted-foreground text-xs">No attendees yet</p>
+        )}
+        {attendees.length > 0 && (
+          <div className="space-y-0.5">
+            {attendees.map((a) => {
+              const rsvp =
+                RSVP_CONFIG[a.responseStatus ?? "needsAction"] ??
+                RSVP_CONFIG.needsAction;
+              return (
+                <div
+                  className="flex items-center gap-2 rounded-md px-1 py-0.5"
+                  key={a.email}
+                >
+                  <Avatar className="size-4">
+                    <AvatarFallback className="bg-muted text-[7px]">
+                      {getInitials(a.email.split("@")[0])}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="min-w-0 flex-1 truncate text-[11px]">
+                    {a.email}
+                  </span>
+                  <span
+                    className={`flex items-center gap-0.5 text-[9px] ${rsvp.className}`}
+                  >
+                    <HugeiconsIcon icon={rsvp.icon} size={9} strokeWidth={2} />
+                    {rsvp.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {showInvite && (
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <Input
+              autoFocus
+              className="h-7 flex-1 text-xs"
+              onChange={(e) => setInviteEmail(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleInvite();
+                }
+                if (e.key === "Escape") {
+                  setShowInvite(false);
+                }
+              }}
+              placeholder="email@example.com"
+              type="email"
+              value={inviteEmail}
+            />
+            <Button
+              className="h-7 text-xs"
+              disabled={!inviteEmail.trim() || addAttendees.isPending}
+              onClick={handleInvite}
+              size="sm"
+            >
+              {addAttendees.isPending ? "…" : "Send"}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inline edit for lead task
+// ---------------------------------------------------------------------------
+function LeadTaskInlineEdit({
   task: t,
   leadId,
-  onToggle,
-  onDelete,
-  onReschedule,
+  onClose,
 }: {
   task: {
     id: string;
     title: string;
+    description: string | null;
+    dueAt: Date;
+    type: string;
+  };
+  leadId: string;
+  onClose: () => void;
+}) {
+  const updateTask = useUpdateTask();
+  const [title, setTitle] = useState(t.title);
+  const [description, setDescription] = useState(t.description ?? "");
+  const [dueAt, setDueAt] = useState<Date | null>(new Date(t.dueAt));
+  const [type, setType] = useState(t.type);
+
+  function handleSave() {
+    if (!(title.trim() && dueAt)) {
+      return;
+    }
+    updateTask.mutate(
+      {
+        id: t.id,
+        data: {
+          title,
+          description: description || undefined,
+          dueAt,
+          type,
+        },
+        leadId,
+      },
+      { onSuccess: onClose }
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <Input
+        autoFocus
+        className="text-sm"
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            handleSave();
+          }
+        }}
+        placeholder="Task title"
+        value={title}
+      />
+      <Textarea
+        className="min-h-[48px] text-xs"
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Description…"
+        value={description}
+      />
+      <div className="flex items-center gap-2">
+        <TaskTypePicker className="flex-1" onChange={setType} value={type} />
+        <DateTimePicker
+          className="flex-1"
+          onChange={(d) => setDueAt(d)}
+          value={dueAt}
+        />
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button onClick={onClose} size="sm" variant="ghost">
+          Cancel
+        </Button>
+        <Button
+          disabled={!(title.trim() && dueAt) || updateTask.isPending}
+          onClick={handleSave}
+          size="sm"
+        >
+          Save
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Expanded detail for lead task
+// ---------------------------------------------------------------------------
+function LeadTaskDetail({
+  task: t,
+  leadId,
+  onDelete,
+}: {
+  task: {
+    id: string;
+    title: string;
+    description: string | null;
+    dueAt: Date;
+    type: string;
+    calendarEventId: string | null;
+    meetingLink: string | null;
+    user: { id: string; name: string } | null;
+  };
+  leadId: string;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const isMeeting = t.type === "meeting" || t.type === "demo";
+
+  if (editing) {
+    return (
+      <LeadTaskInlineEdit
+        leadId={leadId}
+        onClose={() => setEditing(false)}
+        task={t}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {t.description && (
+        <p className="text-muted-foreground text-xs">{t.description}</p>
+      )}
+
+      {isMeeting && t.calendarEventId && (
+        <LeadMeetingDetail
+          calendarEventId={t.calendarEventId}
+          leadId={leadId}
+          meetingLink={t.meetingLink}
+          taskId={t.id}
+        />
+      )}
+
+      {isMeeting && !t.calendarEventId && t.meetingLink && (
+        <a
+          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2.5 py-1 text-emerald-400 text-xs transition-colors hover:bg-emerald-500/20"
+          href={t.meetingLink}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <HugeiconsIcon icon={Link01Icon} size={12} strokeWidth={1.5} />
+          {t.meetingLink}
+        </a>
+      )}
+
+      {t.user && (
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground">Assigned:</span>
+          <Avatar className="size-4">
+            <AvatarFallback className="bg-primary/10 text-[7px] text-primary">
+              {getInitials(t.user.name)}
+            </AvatarFallback>
+          </Avatar>
+          <span className="text-xs">{t.user.name}</span>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 border-t pt-2">
+        <Button onClick={() => setEditing(true)} size="sm" variant="outline">
+          <HugeiconsIcon icon={Edit02Icon} size={12} strokeWidth={1.5} />
+          Edit
+        </Button>
+        <Button
+          className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+          onClick={onDelete}
+          size="sm"
+          variant="ghost"
+        >
+          <HugeiconsIcon icon={Delete02Icon} size={12} strokeWidth={1.5} />
+          Delete
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Single task row for lead detail — expandable
+// ---------------------------------------------------------------------------
+function LeadTaskRow({
+  task: t,
+  leadId,
+  expanded,
+  onToggleExpand,
+  onToggle,
+  onDelete,
+}: {
+  task: {
+    id: string;
+    title: string;
+    description: string | null;
     dueAt: Date;
     completedAt: Date | null;
     type: string;
-    recurrence?: string | null;
-    meetingLink?: string | null;
+    recurrence: string | null;
+    meetingLink: string | null;
+    calendarEventId: string | null;
+    user: { id: string; name: string } | null;
   };
   leadId: string;
+  expanded: boolean;
+  onToggleExpand: () => void;
   onToggle: ReturnType<typeof useToggleTask>;
   onDelete: ReturnType<typeof useDeleteTask>;
-  onReschedule: ReturnType<typeof useRescheduleTask>;
 }) {
   const isComplete = !!t.completedAt;
   const overdue = !isComplete && dayjs(t.dueAt).isBefore(dayjs(), "minute");
+  const isMeeting = t.type === "meeting" || t.type === "demo";
+  const showJoin = isMeeting && t.meetingLink && !expanded;
 
   return (
-    <div className="group flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/40">
-      <TaskCheckbox
-        checked={isComplete}
-        onChange={() => onToggle.mutate({ id: t.id, isComplete, leadId })}
-      />
-      <div className="min-w-0 flex-1">
-        <p
-          className={`text-sm leading-tight ${isComplete ? "text-muted-foreground line-through" : ""}`}
-        >
-          {t.title}
-        </p>
-        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-          <TaskTypeBadge type={t.type} />
-          <RecurrenceBadge recurrence={t.recurrence ?? null} />
-          {t.meetingLink && (
-            <a
-              className="inline-flex items-center gap-0.5 rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[9px] text-cyan-400 uppercase transition-colors hover:bg-cyan-500/25"
-              href={t.meetingLink}
-              onClick={(e) => e.stopPropagation()}
-              rel="noopener noreferrer"
-              target="_blank"
+    <div
+      className={`rounded-lg transition-colors ${
+        expanded ? "bg-muted/50" : "hover:bg-muted/30"
+      }`}
+    >
+      <button
+        className="flex w-full cursor-pointer items-start gap-2 px-2 py-1.5 text-left"
+        onClick={onToggleExpand}
+        type="button"
+      >
+        {/* biome-ignore lint/a11y: checkbox handles its own a11y */}
+        <span className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+          <TaskCheckbox
+            checked={isComplete}
+            onChange={() => onToggle.mutate({ id: t.id, isComplete, leadId })}
+          />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span
+              className={`flex-1 text-sm leading-tight ${isComplete ? "text-muted-foreground line-through" : ""}`}
             >
-              <HugeiconsIcon icon={Link01Icon} size={8} strokeWidth={2} />
-              Join
-            </a>
-          )}
-          <span
-            className={`text-[11px] ${overdue ? "text-red-400" : "text-muted-foreground"}`}
-          >
-            {dayjs(t.dueAt).format("MMM D")} · {dayjs(t.dueAt).fromNow()}
-            {overdue && " · overdue"}
-          </span>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
-        {!isComplete && (
-          <Button
-            onClick={() => onReschedule.mutate({ id: t.id, days: 1, leadId })}
-            size="icon-sm"
-            title="+1 day"
-            variant="ghost"
-          >
-            <span className="font-mono text-[9px]">+1d</span>
-          </Button>
-        )}
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button size="icon-sm" variant="ghost" />}
-          >
-            <HugeiconsIcon
-              icon={MoreHorizontalIcon}
-              size={12}
-              strokeWidth={1.5}
-            />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {!isComplete && (
-              <>
-                <DropdownMenuItem
-                  onClick={() =>
-                    onReschedule.mutate({ id: t.id, days: 1, leadId })
-                  }
-                >
-                  <HugeiconsIcon
-                    icon={Calendar01Icon}
-                    size={14}
-                    strokeWidth={1.5}
-                  />
-                  Tomorrow
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() =>
-                    onReschedule.mutate({ id: t.id, days: 3, leadId })
-                  }
-                >
-                  <HugeiconsIcon
-                    icon={Calendar01Icon}
-                    size={14}
-                    strokeWidth={1.5}
-                  />
-                  +3 days
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() =>
-                    onReschedule.mutate({ id: t.id, days: 7, leadId })
-                  }
-                >
-                  <HugeiconsIcon
-                    icon={Calendar01Icon}
-                    size={14}
-                    strokeWidth={1.5}
-                  />
-                  +1 week
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
+              {t.title}
+            </span>
+            {showJoin && (
+              <a
+                className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-400 transition-colors hover:bg-emerald-500/20"
+                href={t.meetingLink ?? ""}
+                onClick={(e) => e.stopPropagation()}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <HugeiconsIcon
+                  icon={ComputerVideoCallIcon}
+                  size={9}
+                  strokeWidth={2}
+                />
+                Join
+              </a>
             )}
-            <DropdownMenuItem
-              onClick={() => onDelete.mutate({ id: t.id, leadId })}
-              variant="destructive"
+          </span>
+          <span className="mt-0.5 flex flex-wrap items-center gap-1">
+            <TaskTypeBadge type={t.type} />
+            <RecurrenceBadge recurrence={t.recurrence} />
+            <span
+              className={`text-[11px] ${overdue ? "text-red-400" : "text-muted-foreground"}`}
             >
-              <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={1.5} />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+              {dayjs(t.dueAt).format("h:mm A")} · {dayjs(t.dueAt).fromNow()}
+            </span>
+          </span>
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="border-border/50 border-t px-2 pt-2 pb-2 pl-8">
+          <LeadTaskDetail
+            leadId={leadId}
+            onDelete={() => onDelete.mutate({ id: t.id, leadId })}
+            task={t}
+          />
+        </div>
+      )}
     </div>
   );
 }

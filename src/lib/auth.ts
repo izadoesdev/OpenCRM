@@ -4,7 +4,7 @@ import { nextCookies } from "better-auth/next-js";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 
-const ALLOWED_DOMAIN = "databuddy.cc";
+const ALLOWED_DOMAIN = process.env.ALLOWED_DOMAIN ?? "";
 
 if (!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)) {
   throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set");
@@ -34,7 +34,7 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
-          if (!user.email?.endsWith(`@${ALLOWED_DOMAIN}`)) {
+          if (ALLOWED_DOMAIN && !user.email?.endsWith(`@${ALLOWED_DOMAIN}`)) {
             await Promise.reject(
               new Error(`Only @${ALLOWED_DOMAIN} email addresses are allowed.`)
             );

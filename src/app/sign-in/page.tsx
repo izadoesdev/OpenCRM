@@ -1,6 +1,6 @@
 "use client";
 
-import { Mail01Icon, Target01Icon } from "@hugeicons/core-free-icons";
+import { Mail01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -28,17 +28,24 @@ export default function SignInPage() {
     <div className="flex min-h-svh items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-2 text-center">
-          <div className="mx-auto flex size-10 items-center justify-center rounded-sm bg-foreground">
-            <HugeiconsIcon
-              className="text-background"
-              icon={Target01Icon}
-              size={20}
-              strokeWidth={2}
-            />
+          <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-foreground">
+            <svg
+              aria-hidden="true"
+              className="size-6 text-background"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 6v6l4 2" />
+            </svg>
           </div>
-          <h1 className="font-semibold text-xl tracking-tight">DataCRM</h1>
+          <h1 className="font-semibold text-xl tracking-tight">OpenCRM</h1>
           <p className="text-muted-foreground text-sm">
-            Sign in with your Databuddy account
+            Sign in to your workspace
           </p>
         </div>
 
@@ -80,7 +87,7 @@ export default function SignInPage() {
             size={12}
             strokeWidth={1.5}
           />
-          Only @databuddy.cc accounts are allowed
+          Organization accounts only
         </p>
       </div>
     </div>

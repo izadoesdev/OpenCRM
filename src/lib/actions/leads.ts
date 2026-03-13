@@ -63,6 +63,7 @@ export async function getLead(id: string) {
       },
       tasks: {
         orderBy: [desc(task.dueAt)],
+        with: { user: true },
       },
       assignedUser: true,
     },

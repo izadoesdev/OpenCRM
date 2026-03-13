@@ -35,7 +35,7 @@ export default function ErrorPage({
         <div className="flex flex-col gap-2">
           <Button onClick={reset}>Try again</Button>
           <Button render={<Link href="/" />} variant="ghost">
-            Back to DataCRM
+            Back to OpenCRM
           </Button>
         </div>
       </div>

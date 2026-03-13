@@ -15,8 +15,11 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DataCRM — Lead Generation",
-  description: "Smart CRM for lead generation and pipeline management",
+  title: "OpenCRM",
+  description: "Open-source CRM for lead generation and pipeline management",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

@@ -11,7 +11,7 @@ const errorMessages: Record<string, { title: string; description: string }> = {
   unable_to_create_user: {
     title: "Access denied",
     description:
-      "Only @databuddy.cc accounts can access DataCRM. Sign in with your Databuddy Google account.",
+      "Your account isn't authorized to access OpenCRM. Contact your administrator.",
   },
   please_restart_the_process: {
     title: "Session expired",
@@ -59,7 +59,7 @@ function AuthErrorContent() {
           <Button render={<Link href="/sign-in" />}>Try again</Button>
           <Button render={<Link href="/" />} variant="ghost">
             <HugeiconsIcon icon={Target01Icon} size={16} strokeWidth={1.5} />
-            Back to DataCRM
+            Back to OpenCRM
           </Button>
         </div>
       </div>

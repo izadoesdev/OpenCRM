@@ -22,7 +22,6 @@ import {
   useCalendarEvents,
   useDashboard,
   useGoogleConnection,
-  useRescheduleTask,
   useToggleTask,
 } from "@/lib/queries";
 import { formatCents, getInitials } from "@/lib/utils";
@@ -34,7 +33,6 @@ const ACTIVE_STATUSES = LEAD_STATUSES.filter(
 export function DashboardClient() {
   const { data, isLoading } = useDashboard();
   const toggleTask = useToggleTask();
-  const rescheduleTask = useRescheduleTask();
   const { data: gConn } = useGoogleConnection();
   const { data: calEvents = [] as CalendarEvent[] } = useCalendarEvents({
     maxResults: 5,
@@ -156,20 +154,17 @@ export function DashboardClient() {
               <TaskSection
                 label="Overdue"
                 labelClass="text-red-400"
-                onReschedule={rescheduleTask}
                 onToggle={toggleTask}
                 tasks={overdueTasks}
               />
               <TaskSection
                 label="Today"
                 labelClass="text-amber-400"
-                onReschedule={rescheduleTask}
                 onToggle={toggleTask}
                 tasks={todayTasks}
               />
               <TaskSection
                 label="Upcoming"
-                onReschedule={rescheduleTask}
                 onToggle={toggleTask}
                 tasks={laterTasks}
               />
@@ -203,11 +198,19 @@ export function DashboardClient() {
                           {dayjs(ev.start.dateTime).fromNow()}
                         </span>
                       </div>
-                      <span className="min-w-0 flex-1 truncate text-sm">
-                        {ev.summary}
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <span className="block truncate text-sm">
+                          {ev.summary}
+                        </span>
+                        {(ev.attendees?.length ?? 0) > 0 && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {ev.attendees?.length} attendee
+                            {ev.attendees?.length === 1 ? "" : "s"}
+                          </span>
+                        )}
+                      </div>
                       {ev.hangoutLink && (
-                        <span className="shrink-0 rounded-sm bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-400">
+                        <span className="shrink-0 rounded-sm bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400">
                           Meet
                         </span>
                       )}
@@ -362,13 +365,11 @@ function TaskSection({
   labelClass,
   tasks,
   onToggle,
-  onReschedule,
 }: {
   label: string;
   labelClass?: string;
   tasks: TaskItem[];
   onToggle: ReturnType<typeof useToggleTask>;
-  onReschedule: ReturnType<typeof useRescheduleTask>;
 }) {
   if (tasks.length === 0) {
     return null;
@@ -382,12 +383,7 @@ function TaskSection({
       </p>
       <div className="space-y-0.5">
         {tasks.map((t) => (
-          <DashboardTaskRow
-            key={t.id}
-            onReschedule={onReschedule}
-            onToggle={onToggle}
-            task={t}
-          />
+          <DashboardTaskRow key={t.id} onToggle={onToggle} task={t} />
         ))}
       </div>
     </div>
@@ -397,68 +393,53 @@ function TaskSection({
 function DashboardTaskRow({
   task: t,
   onToggle,
-  onReschedule,
 }: {
   task: TaskItem;
   onToggle: ReturnType<typeof useToggleTask>;
-  onReschedule: ReturnType<typeof useRescheduleTask>;
 }) {
   const overdue =
     dayjs(t.dueAt).isBefore(dayjs(), "minute") && !dayjs(t.dueAt).isToday();
 
   return (
-    <div className="group flex items-start gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/40">
-      <TaskCheckbox
-        checked={false}
-        onChange={() =>
-          onToggle.mutate({ id: t.id, isComplete: false, leadId: t.leadId })
-        }
-      />
+    <Link
+      className="group flex items-start gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/40"
+      href="/tasks"
+    >
+      {/* biome-ignore lint/a11y: checkbox handles its own a11y */}
+      <span onClick={(e) => e.stopPropagation()}>
+        <TaskCheckbox
+          checked={false}
+          onChange={() =>
+            onToggle.mutate({ id: t.id, isComplete: false, leadId: t.leadId })
+          }
+        />
+      </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm leading-tight">{t.title}</p>
         <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
           {t.lead && (
-            <Link
-              className="text-muted-foreground text-xs transition-colors hover:text-foreground hover:underline"
-              href={`/leads/${t.lead.id}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {t.lead.name}
-            </Link>
+            <span className="text-muted-foreground text-xs">{t.lead.name}</span>
           )}
           <TaskTypeBadge type={t.type} />
           <RecurrenceBadge recurrence={t.recurrence} />
-          {t.meetingLink && (
-            <a
-              className="inline-flex items-center gap-0.5 rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[9px] text-cyan-400 uppercase transition-colors hover:bg-cyan-500/25"
-              href={t.meetingLink}
-              onClick={(e) => e.stopPropagation()}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              Join
-            </a>
-          )}
           <span
             className={`text-[11px] ${overdue ? "text-red-400" : "text-muted-foreground"}`}
           >
-            {dayjs(t.dueAt).format("MMM D, h:mm A")} ·{" "}
-            {dayjs(t.dueAt).fromNow()}
+            {dayjs(t.dueAt).format("h:mm A")} · {dayjs(t.dueAt).fromNow()}
           </span>
         </div>
       </div>
-      <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
-        <Button
-          onClick={() =>
-            onReschedule.mutate({ id: t.id, days: 1, leadId: t.leadId })
-          }
-          size="icon-sm"
-          title="+1 day"
-          variant="ghost"
+      {t.meetingLink && (
+        <a
+          className="shrink-0 rounded-sm bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400 transition-colors hover:bg-emerald-500/20"
+          href={t.meetingLink}
+          onClick={(e) => e.stopPropagation()}
+          rel="noopener noreferrer"
+          target="_blank"
         >
-          <HugeiconsIcon icon={Calendar01Icon} size={12} strokeWidth={1.5} />
-        </Button>
-      </div>
-    </div>
+          Join
+        </a>
+      )}
+    </Link>
   );
 }

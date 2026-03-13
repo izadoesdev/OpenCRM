@@ -5,7 +5,12 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { lead, task } from "@/db/schema";
-import { createCalendarEvent } from "@/lib/actions/calendar";
+import {
+  addCalendarAttendees,
+  createCalendarEvent,
+  deleteCalendarEvent,
+  updateCalendarEvent,
+} from "@/lib/actions/calendar";
 import { auth } from "@/lib/auth";
 import dayjs from "@/lib/dayjs";
 
@@ -42,6 +47,95 @@ function nextDueDate(current: Date, recurrence: string): Date {
       return d.add(1, "day").toDate();
   }
 }
+
+function isMeetingType(t: string) {
+  return t === "meeting" || t === "demo";
+}
+
+// ---------------------------------------------------------------------------
+// Calendar sync helpers
+// ---------------------------------------------------------------------------
+
+type TaskUpdateFields = Partial<{
+  title: string;
+  description: string;
+  dueAt: Date;
+  type: string;
+  userId: string | null;
+  recurrence: string | null;
+  meetingLink: string | null;
+}>;
+
+async function handleCalendarOnTypeChange(
+  existing: { calendarEventId: string | null; type: string },
+  newType: string | undefined,
+  taskId: string
+): Promise<{ ops: string[]; clearMeeting: boolean }> {
+  const ops: string[] = [];
+  const wasMeeting = isMeetingType(existing.type);
+  const willBeMeeting =
+    newType !== undefined ? isMeetingType(newType) : wasMeeting;
+
+  if (wasMeeting && !willBeMeeting && existing.calendarEventId) {
+    try {
+      await deleteCalendarEvent(existing.calendarEventId);
+      ops.push("calendar_cancelled");
+    } catch {
+      ops.push("calendar_cancel_failed");
+    }
+    await db
+      .update(task)
+      .set({ calendarEventId: null })
+      .where(eq(task.id, taskId));
+    return { ops, clearMeeting: true };
+  }
+
+  return { ops, clearMeeting: false };
+}
+
+async function handleCalendarFieldSync(
+  existing: { calendarEventId: string | null; type: string },
+  updates: TaskUpdateFields
+): Promise<string[]> {
+  if (!existing.calendarEventId) {
+    return [];
+  }
+  if (!isMeetingType(existing.type)) {
+    return [];
+  }
+
+  const ops: string[] = [];
+  const calPatch: {
+    summary?: string;
+    description?: string;
+    startTime?: Date;
+  } = {};
+
+  if (updates.title) {
+    calPatch.summary = updates.title;
+  }
+  if (updates.description !== undefined) {
+    calPatch.description = updates.description;
+  }
+  if (updates.dueAt) {
+    calPatch.startTime = updates.dueAt;
+  }
+
+  if (Object.keys(calPatch).length > 0) {
+    try {
+      await updateCalendarEvent(existing.calendarEventId, calPatch);
+      ops.push("calendar_updated");
+    } catch {
+      ops.push("calendar_update_failed");
+    }
+  }
+
+  return ops;
+}
+
+// ---------------------------------------------------------------------------
+// CRUD
+// ---------------------------------------------------------------------------
 
 export async function getTasks(opts?: {
   showCompleted?: boolean;
@@ -89,10 +183,7 @@ export async function createTask(data: {
   let calendarEventId: string | null = null;
   let meetingLink = data.meetingLink ?? null;
 
-  if (
-    data.syncToCalendar &&
-    (data.type === "meeting" || data.type === "demo")
-  ) {
+  if (data.syncToCalendar && isMeetingType(data.type ?? "follow_up")) {
     try {
       const leadRow = await db.query.lead.findFirst({
         where: eq(lead.id, data.leadId),
@@ -111,7 +202,7 @@ export async function createTask(data: {
         meetingLink = calResult.meetLink;
       }
     } catch {
-      // Calendar sync failed silently — task still gets created
+      // Calendar sync failed — task still gets created
     }
   }
 
@@ -134,27 +225,38 @@ export async function createTask(data: {
   return row;
 }
 
-export async function updateTask(
-  id: string,
-  data: Partial<{
-    title: string;
-    description: string;
-    dueAt: Date;
-    type: string;
-    userId: string | null;
-    recurrence: string | null;
-    meetingLink: string | null;
-  }>
-) {
+export async function updateTask(id: string, data: TaskUpdateFields) {
   await getUser();
+
+  const existing = await db.query.task.findFirst({ where: eq(task.id, id) });
+  if (!existing) {
+    throw new Error("Task not found");
+  }
+
+  const calendarOps: string[] = [];
+
+  const { ops: typeOps, clearMeeting } = await handleCalendarOnTypeChange(
+    existing,
+    data.type,
+    id
+  );
+  calendarOps.push(...typeOps);
+
+  if (!clearMeeting) {
+    const syncOps = await handleCalendarFieldSync(existing, data);
+    calendarOps.push(...syncOps);
+  }
+
+  const setData = clearMeeting ? { ...data, meetingLink: null } : data;
+
   const [row] = await db
     .update(task)
-    .set(data)
+    .set(setData)
     .where(eq(task.id, id))
     .returning();
 
   revalidateAll(row?.leadId);
-  return row;
+  return { ...row, calendarOps };
 }
 
 export async function completeTask(id: string) {
@@ -172,22 +274,63 @@ export async function completeTask(id: string) {
     .where(eq(task.id, id))
     .returning();
 
+  if (isMeetingType(existing.type) && existing.calendarEventId) {
+    try {
+      await deleteCalendarEvent(existing.calendarEventId);
+    } catch {
+      /* best-effort */
+    }
+  }
+
   if (existing.recurrence) {
     const base = existing.dueAt < new Date() ? new Date() : existing.dueAt;
-    await db.insert(task).values({
-      leadId: existing.leadId,
-      userId: existing.userId,
-      title: existing.title,
-      description: existing.description,
-      type: existing.type,
-      recurrence: existing.recurrence,
-      meetingLink: existing.meetingLink,
-      dueAt: nextDueDate(base, existing.recurrence),
-    });
+    const nextDue = nextDueDate(base, existing.recurrence);
+    await createRecurringFollowUp(existing, nextDue);
   }
 
   revalidateAll(row?.leadId);
   return row;
+}
+
+async function createRecurringFollowUp(
+  existing: typeof task.$inferSelect,
+  nextDue: Date
+) {
+  let newCalendarEventId: string | null = null;
+  let newMeetingLink = existing.meetingLink;
+
+  if (isMeetingType(existing.type)) {
+    try {
+      const leadRow = await db.query.lead.findFirst({
+        where: eq(lead.id, existing.leadId),
+      });
+      const calResult = await createCalendarEvent({
+        summary: existing.title,
+        description: existing.description ?? undefined,
+        startTime: nextDue,
+        attendeeEmails: leadRow?.email ? [leadRow.email] : undefined,
+        addMeetLink: true,
+      });
+      newCalendarEventId = calResult.eventId;
+      if (calResult.meetLink) {
+        newMeetingLink = calResult.meetLink;
+      }
+    } catch {
+      /* recurring task still created without calendar */
+    }
+  }
+
+  await db.insert(task).values({
+    leadId: existing.leadId,
+    userId: existing.userId,
+    title: existing.title,
+    description: existing.description,
+    type: existing.type,
+    recurrence: existing.recurrence,
+    meetingLink: newMeetingLink,
+    calendarEventId: newCalendarEventId,
+    dueAt: nextDue,
+  });
 }
 
 export async function uncompleteTask(id: string) {
@@ -212,19 +355,86 @@ export async function rescheduleTask(id: string, days: number) {
   }
 
   const baseDate = existing.dueAt < new Date() ? new Date() : existing.dueAt;
+  const newDue = dayjs(baseDate).add(days, "day").toDate();
+
   const [row] = await db
     .update(task)
-    .set({ dueAt: dayjs(baseDate).add(days, "day").toDate() })
+    .set({ dueAt: newDue })
     .where(eq(task.id, id))
     .returning();
+
+  if (existing.calendarEventId) {
+    try {
+      await updateCalendarEvent(existing.calendarEventId, {
+        startTime: newDue,
+      });
+    } catch {
+      /* calendar sync best-effort */
+    }
+  }
 
   revalidateAll(row?.leadId);
   return row;
 }
 
+export async function rescheduleTaskTo(id: string, newDate: Date) {
+  await getUser();
+  const existing = await db.query.task.findFirst({
+    where: eq(task.id, id),
+  });
+  if (!existing) {
+    throw new Error("Task not found");
+  }
+
+  const [row] = await db
+    .update(task)
+    .set({ dueAt: newDate })
+    .where(eq(task.id, id))
+    .returning();
+
+  if (existing.calendarEventId) {
+    try {
+      await updateCalendarEvent(existing.calendarEventId, {
+        startTime: newDate,
+      });
+    } catch {
+      /* calendar sync best-effort */
+    }
+  }
+
+  revalidateAll(row?.leadId);
+  return row;
+}
+
+export async function addTaskAttendees(id: string, emails: string[]) {
+  await getUser();
+  const existing = await db.query.task.findFirst({
+    where: eq(task.id, id),
+  });
+  if (!existing?.calendarEventId) {
+    throw new Error("Task has no calendar event");
+  }
+
+  await addCalendarAttendees(existing.calendarEventId, emails);
+  revalidateAll(existing.leadId);
+}
+
 export async function deleteTask(id: string) {
   await getUser();
+  const existing = await db.query.task.findFirst({
+    where: eq(task.id, id),
+  });
+
   const [row] = await db.delete(task).where(eq(task.id, id)).returning();
+
+  if (existing?.calendarEventId) {
+    try {
+      await deleteCalendarEvent(existing.calendarEventId);
+    } catch {
+      /* calendar sync best-effort */
+    }
+  }
+
   revalidateAll(row?.leadId);
 }
 

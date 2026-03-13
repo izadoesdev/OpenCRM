@@ -1,36 +1,126 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OpenCRM
+
+Open-source CRM for lead generation, pipeline management, and team collaboration. Built with Next.js, PostgreSQL, and Google Workspace integrations.
+
+## Features
+
+- **Lead management** — Track leads through customizable pipeline stages with drag-and-drop Kanban board
+- **Task system** — Create, assign, and track tasks with recurrence, meeting links, and calendar sync
+- **Google Calendar** — Two-way sync for meeting tasks with attendee RSVP tracking and Google Meet links
+- **Gmail integration** — Send and read emails directly from lead profiles
+- **Team collaboration** — Assign leads and tasks to team members with role-based filtering
+- **Email templates** — Reusable templates with merge tags (`{{name}}`, `{{company}}`, `{{title}}`)
+- **Dashboard** — Overview of pipeline health, upcoming tasks, calendar events, and recent activity
+- **Command palette** — Quick navigation with `Cmd+K`
+
+## Tech Stack
+
+- **Framework** — [Next.js 16](https://nextjs.org) (App Router, Server Actions, React Server Components)
+- **Database** — PostgreSQL with [Drizzle ORM](https://orm.drizzle.team)
+- **Auth** — [Better Auth](https://better-auth.com) with Google OAuth
+- **UI** — [Tailwind CSS v4](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com), [Hugeicons](https://hugeicons.com)
+- **Data fetching** — [TanStack Query](https://tanstack.com/query) with optimistic updates
+- **Email** — [Resend](https://resend.com) + Gmail API
+- **Calendar** — Google Calendar API
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- [Bun](https://bun.sh) (or Node.js 20+)
+- PostgreSQL database
+- Google Cloud project with OAuth credentials
+
+### Setup
+
+1. Clone the repository:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
+git clone https://github.com/your-org/OpenCRM.git
+cd OpenCRM
+bun install
+```
+
+2. Create `.env.local` with the following variables:
+
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/opencrm
+
+# Google OAuth (required)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Optional: restrict sign-ups to a specific email domain
+# Leave empty to allow all Google accounts
+ALLOWED_DOMAIN=
+
+# Optional: email sending via Resend
+RESEND_API_KEY=your-resend-api-key
+EMAIL_FROM=noreply@yourdomain.com
+
+# Better Auth
+BETTER_AUTH_SECRET=generate-a-random-secret
+BETTER_AUTH_URL=http://localhost:3000
+```
+
+3. Push the database schema:
+
+```bash
+bun run db:push
+```
+
+4. Start the dev server:
+
+```bash
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Google OAuth Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a new project or select existing
+3. Enable **Google Calendar API** and **Gmail API**
+4. Create OAuth 2.0 credentials (Web application)
+5. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+6. Copy Client ID and Client Secret to `.env.local`
 
-## Learn More
+For calendar and Gmail features, add test users in **OAuth consent screen > Test users** while your app is in testing mode.
 
-To learn more about Next.js, take a look at the following resources:
+## Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── app/                    # Next.js App Router pages
+│   ├── (auth)/             # Auth pages (sign-in, error)
+│   ├── (dashboard)/        # Main app pages
+│   │   ├── dashboard-client.tsx
+│   │   ├── leads/          # Lead list + detail pages
+│   │   ├── pipeline/       # Kanban pipeline view
+│   │   └── tasks/          # Task management
+│   └── layout.tsx
+├── components/             # Shared UI components
+│   ├── ui/                 # shadcn/ui primitives
+│   ├── app-sidebar.tsx     # Navigation sidebar
+│   ├── command-menu.tsx    # Cmd+K palette
+│   └── ...
+├── db/
+│   ├── index.ts            # Drizzle client
+│   └── schema.ts           # Database schema
+└── lib/
+    ├── actions/            # Server actions
+    │   ├── calendar.ts     # Google Calendar integration
+    │   ├── gmail.ts        # Gmail integration
+    │   ├── leads.ts        # Lead CRUD
+    │   ├── tasks.ts        # Task CRUD + calendar sync
+    │   └── ...
+    ├── auth.ts             # Better Auth config
+    ├── google.ts           # Google API client + token refresh
+    ├── queries.ts          # TanStack Query hooks
+    └── utils.ts
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## License
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT

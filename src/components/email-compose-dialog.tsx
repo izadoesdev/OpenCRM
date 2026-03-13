@@ -148,7 +148,7 @@ export function EmailComposeDialog({
               autoFocus
               id="email-subject"
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Re: Your interest in Databuddy"
+              placeholder="Re: Following up"
               required
               value={subject}
             />

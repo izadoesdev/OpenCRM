@@ -95,6 +95,63 @@ export async function getUpcomingCalendarEvents(opts?: {
   return data.items ?? [];
 }
 
+export async function updateCalendarEvent(
+  eventId: string,
+  data: {
+    summary?: string;
+    description?: string;
+    startTime?: Date;
+    endTime?: Date;
+    attendeeEmails?: string[];
+  }
+): Promise<CalendarEvent> {
+  const body: Record<string, unknown> = {};
+  if (data.summary) {
+    body.summary = data.summary;
+  }
+  if (data.description !== undefined) {
+    body.description = data.description;
+  }
+  if (data.startTime) {
+    body.start = { dateTime: data.startTime.toISOString() };
+    body.end = {
+      dateTime: (
+        data.endTime ?? dayjs(data.startTime).add(1, "hour").toDate()
+      ).toISOString(),
+    };
+  }
+  if (data.attendeeEmails) {
+    body.attendees = data.attendeeEmails.map((email) => ({ email }));
+  }
+
+  return googleFetch<CalendarEvent>(
+    `${CAL_BASE}/calendars/primary/events/${eventId}`,
+    { method: "PATCH", body: JSON.stringify(body) }
+  );
+}
+
+export async function addCalendarAttendees(
+  eventId: string,
+  newEmails: string[]
+): Promise<CalendarEvent> {
+  const existing = await getCalendarEvent(eventId);
+  const currentEmails = new Set(existing.attendees?.map((a) => a.email) ?? []);
+  const allAttendees = [
+    ...(existing.attendees ?? []),
+    ...newEmails
+      .filter((e) => !currentEmails.has(e))
+      .map((email) => ({ email })),
+  ];
+
+  return googleFetch<CalendarEvent>(
+    `${CAL_BASE}/calendars/primary/events/${eventId}?sendUpdates=all`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ attendees: allAttendees }),
+    }
+  );
+}
+
 export async function deleteCalendarEvent(eventId: string): Promise<void> {
   await googleFetch(`${CAL_BASE}/calendars/primary/events/${eventId}`, {
     method: "DELETE",

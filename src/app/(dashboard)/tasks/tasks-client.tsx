@@ -1,10 +1,14 @@
 "use client";
 
 import {
-  Calendar01Icon,
+  Cancel01Icon,
+  CheckmarkCircle01Icon,
+  ComputerVideoCallIcon,
   Delete02Icon,
   Edit02Icon,
-  MoreHorizontalIcon,
+  HelpCircleIcon,
+  Link01Icon,
+  Mail01Icon,
   Task01Icon,
   UserIcon,
 } from "@hugeicons/core-free-icons";
@@ -22,20 +26,6 @@ import {
 } from "@/components/task-type-picker";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -43,17 +33,20 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/lib/auth-client";
 import { TASK_TYPE_LABELS, TASK_TYPES } from "@/lib/constants";
 import dayjs from "@/lib/dayjs";
 import {
+  useAddTaskAttendees,
+  useCalendarEvent,
   useDeleteTask,
-  useRescheduleTask,
   useTasks,
   useTeamMembers,
   useToggleTask,
   useUpdateTask,
 } from "@/lib/queries";
+import { getInitials } from "@/lib/utils";
 
 interface TaskUser {
   email: string;
@@ -63,6 +56,7 @@ interface TaskUser {
 }
 
 interface TaskWithLead {
+  calendarEventId: string | null;
   completedAt: Date | null;
   description: string | null;
   dueAt: Date;
@@ -77,16 +71,14 @@ interface TaskWithLead {
   userId: string | null;
 }
 
-function getInitials(name?: string | null) {
-  if (!name) {
-    return "?";
+function emptyMessage(typeFilter: string, showCompleted: boolean): string {
+  if (typeFilter !== "all") {
+    return `No ${TASK_TYPE_LABELS[typeFilter]?.toLowerCase() ?? typeFilter} tasks`;
   }
-  return name
-    .split(" ")
-    .map((p) => p[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  if (showCompleted) {
+    return "No tasks at all";
+  }
+  return "All caught up";
 }
 
 const TYPE_FILTERS = [
@@ -130,20 +122,465 @@ function getDueLabel(
   };
 }
 
-function getEmptyMessage(typeFilter: string, showCompleted: boolean): string {
-  if (typeFilter !== "all") {
-    const label = TASK_TYPE_LABELS[typeFilter]?.toLowerCase() ?? typeFilter;
-    return `No ${label} tasks`;
+const RSVP_CONFIG: Record<
+  string,
+  { icon: typeof CheckmarkCircle01Icon; label: string; className: string }
+> = {
+  accepted: {
+    icon: CheckmarkCircle01Icon,
+    label: "Accepted",
+    className: "text-emerald-400",
+  },
+  declined: {
+    icon: Cancel01Icon,
+    label: "Declined",
+    className: "text-red-400",
+  },
+  tentative: {
+    icon: HelpCircleIcon,
+    label: "Maybe",
+    className: "text-amber-400",
+  },
+  needsAction: {
+    icon: Mail01Icon,
+    label: "Pending",
+    className: "text-muted-foreground",
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Meeting detail panel — fetches calendar event data for attendees
+// ---------------------------------------------------------------------------
+function MeetingDetail({
+  calendarEventId,
+  meetingLink,
+  taskId,
+  leadId,
+}: {
+  calendarEventId: string;
+  meetingLink: string | null;
+  taskId: string;
+  leadId: string;
+}) {
+  const { data: event, isLoading } = useCalendarEvent(calendarEventId);
+  const addAttendees = useAddTaskAttendees();
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+
+  function handleInvite() {
+    if (!inviteEmail.trim()) {
+      return;
+    }
+    addAttendees.mutate(
+      {
+        id: taskId,
+        emails: [inviteEmail.trim()],
+        calendarEventId,
+        leadId,
+      },
+      {
+        onSuccess: () => {
+          setInviteEmail("");
+          setShowInvite(false);
+        },
+      }
+    );
   }
-  return showCompleted ? "No tasks at all" : "All caught up";
+
+  const attendees = event?.attendees ?? [];
+
+  return (
+    <div className="space-y-3">
+      {/* Meeting link */}
+      {meetingLink && (
+        <a
+          className="inline-flex items-center gap-2 rounded-md bg-emerald-500/10 px-3 py-1.5 text-emerald-400 text-xs transition-colors hover:bg-emerald-500/20"
+          href={meetingLink}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <HugeiconsIcon
+            icon={ComputerVideoCallIcon}
+            size={14}
+            strokeWidth={1.5}
+          />
+          Join Meeting
+          <span className="text-emerald-400/60">
+            {meetingLink.includes("meet.google") ? "Google Meet" : ""}
+          </span>
+        </a>
+      )}
+
+      {/* Attendees */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
+            Attendees
+            {!isLoading && ` (${attendees.length})`}
+          </span>
+          <button
+            className="text-[11px] text-primary hover:underline"
+            onClick={() => setShowInvite(!showInvite)}
+            type="button"
+          >
+            + Invite
+          </button>
+        </div>
+
+        {isLoading && <p className="text-muted-foreground text-xs">Loading…</p>}
+
+        {!isLoading && attendees.length === 0 && (
+          <p className="text-muted-foreground text-xs">No attendees yet</p>
+        )}
+
+        {attendees.length > 0 && (
+          <div className="space-y-1">
+            {attendees.map((a) => {
+              const rsvp =
+                RSVP_CONFIG[a.responseStatus ?? "needsAction"] ??
+                RSVP_CONFIG.needsAction;
+              const name = a.email.split("@")[0];
+              return (
+                <div
+                  className="flex items-center gap-2 rounded-md px-1 py-0.5"
+                  key={a.email}
+                >
+                  <Avatar className="size-5">
+                    <AvatarFallback className="bg-muted text-[8px]">
+                      {getInitials(name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="min-w-0 flex-1 truncate text-xs">
+                    {a.email}
+                  </span>
+                  <span
+                    className={`flex items-center gap-1 text-[10px] ${rsvp.className}`}
+                  >
+                    <HugeiconsIcon icon={rsvp.icon} size={10} strokeWidth={2} />
+                    {rsvp.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {showInvite && (
+          <div className="mt-2 flex items-center gap-2">
+            <Input
+              autoFocus
+              className="h-7 flex-1 text-xs"
+              onChange={(e) => setInviteEmail(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleInvite();
+                }
+                if (e.key === "Escape") {
+                  setShowInvite(false);
+                }
+              }}
+              placeholder="email@example.com"
+              type="email"
+              value={inviteEmail}
+            />
+            <Button
+              className="h-7 text-xs"
+              disabled={!inviteEmail.trim() || addAttendees.isPending}
+              onClick={handleInvite}
+              size="sm"
+            >
+              {addAttendees.isPending ? "…" : "Send"}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
+// ---------------------------------------------------------------------------
+// Inline edit panel (shown when task is expanded and user clicks Edit)
+// ---------------------------------------------------------------------------
+function InlineEditPanel({
+  task: t,
+  onClose,
+}: {
+  task: TaskWithLead;
+  onClose: () => void;
+}) {
+  const updateTask = useUpdateTask();
+  const [title, setTitle] = useState(t.title);
+  const [description, setDescription] = useState(t.description ?? "");
+  const [dueAt, setDueAt] = useState<Date | null>(new Date(t.dueAt));
+  const [type, setType] = useState(t.type);
+
+  function handleSave() {
+    if (!(title.trim() && dueAt)) {
+      return;
+    }
+    updateTask.mutate(
+      {
+        id: t.id,
+        data: {
+          title,
+          description: description || undefined,
+          dueAt,
+          type,
+        },
+        leadId: t.leadId,
+      },
+      { onSuccess: onClose }
+    );
+  }
+
+  return (
+    <div className="space-y-2.5">
+      <Input
+        autoFocus
+        className="text-sm"
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            handleSave();
+          }
+        }}
+        placeholder="Task title"
+        value={title}
+      />
+      <Textarea
+        className="min-h-[60px] text-xs"
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Add a description…"
+        value={description}
+      />
+      <div className="flex items-center gap-2">
+        <TaskTypePicker className="flex-1" onChange={setType} value={type} />
+        <DateTimePicker
+          className="flex-1"
+          onChange={(d) => setDueAt(d)}
+          value={dueAt}
+        />
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button onClick={onClose} size="sm" variant="ghost">
+          Cancel
+        </Button>
+        <Button
+          disabled={!(title.trim() && dueAt) || updateTask.isPending}
+          onClick={handleSave}
+          size="sm"
+        >
+          Save
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Expanded detail panel for a single task
+// ---------------------------------------------------------------------------
+function TaskDetail({
+  task: t,
+  onDelete,
+}: {
+  task: TaskWithLead;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const isMeeting = t.type === "meeting" || t.type === "demo";
+
+  if (editing) {
+    return <InlineEditPanel onClose={() => setEditing(false)} task={t} />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Description */}
+      {t.description && (
+        <p className="text-muted-foreground text-xs">{t.description}</p>
+      )}
+
+      {/* Meeting detail */}
+      {isMeeting && t.calendarEventId && (
+        <MeetingDetail
+          calendarEventId={t.calendarEventId}
+          leadId={t.leadId}
+          meetingLink={t.meetingLink}
+          taskId={t.id}
+        />
+      )}
+
+      {/* Non-calendar meeting link */}
+      {isMeeting && !t.calendarEventId && t.meetingLink && (
+        <a
+          className="inline-flex items-center gap-2 rounded-md bg-emerald-500/10 px-3 py-1.5 text-emerald-400 text-xs transition-colors hover:bg-emerald-500/20"
+          href={t.meetingLink}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <HugeiconsIcon icon={Link01Icon} size={12} strokeWidth={1.5} />
+          {t.meetingLink}
+        </a>
+      )}
+
+      {/* Lead info */}
+      {t.lead && (
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground">Lead:</span>
+          <Link
+            className="text-primary text-xs hover:underline"
+            href={`/leads/${t.lead.id}`}
+          >
+            {t.lead.name}
+          </Link>
+          <StatusBadge status={t.lead.status} />
+        </div>
+      )}
+
+      {/* Assigned to */}
+      {t.user && (
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground">Assigned:</span>
+          <Avatar className="size-4">
+            <AvatarFallback className="bg-primary/10 text-[7px] text-primary">
+              {getInitials(t.user.name)}
+            </AvatarFallback>
+          </Avatar>
+          <span className="text-xs">{t.user.name}</span>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center gap-2 border-t pt-2">
+        <Button onClick={() => setEditing(true)} size="sm" variant="outline">
+          <HugeiconsIcon icon={Edit02Icon} size={12} strokeWidth={1.5} />
+          Edit
+        </Button>
+        <Button
+          className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+          onClick={onDelete}
+          size="sm"
+          variant="ghost"
+        >
+          <HugeiconsIcon icon={Delete02Icon} size={12} strokeWidth={1.5} />
+          Delete
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Single task row — clickable to expand
+// ---------------------------------------------------------------------------
+function TaskRow({
+  task: t,
+  expanded,
+  onToggleExpand,
+  onToggleComplete,
+  onDelete,
+  showAssignee,
+}: {
+  task: TaskWithLead;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onToggleComplete: () => void;
+  onDelete: () => void;
+  showAssignee: boolean;
+}) {
+  const isComplete = !!t.completedAt;
+  const due = getDueLabel(new Date(t.dueAt), isComplete);
+  const isMeeting = t.type === "meeting" || t.type === "demo";
+  const showJoin = isMeeting && t.meetingLink && !expanded;
+
+  return (
+    <div
+      className={`rounded-lg transition-colors ${
+        expanded ? "bg-muted/50" : "hover:bg-muted/30"
+      }`}
+    >
+      <button
+        className="flex w-full cursor-pointer items-start gap-3 px-3 py-2.5 text-left"
+        onClick={onToggleExpand}
+        type="button"
+      >
+        {/* biome-ignore lint/a11y: checkbox handles its own a11y */}
+        <span className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+          <TaskCheckbox checked={isComplete} onChange={onToggleComplete} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span
+              className={`flex-1 text-sm leading-tight ${isComplete ? "text-muted-foreground line-through" : ""}`}
+            >
+              {t.title}
+            </span>
+            {showJoin && (
+              <a
+                className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400 transition-colors hover:bg-emerald-500/20"
+                href={t.meetingLink ?? ""}
+                onClick={(e) => e.stopPropagation()}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <HugeiconsIcon
+                  icon={ComputerVideoCallIcon}
+                  size={10}
+                  strokeWidth={2}
+                />
+                Join
+              </a>
+            )}
+          </span>
+          <span className="mt-1 flex flex-wrap items-center gap-1.5">
+            <TaskTypeBadge type={t.type} />
+            <RecurrenceBadge recurrence={t.recurrence} />
+            {t.lead && (
+              <Link
+                className="text-muted-foreground text-xs transition-colors hover:text-foreground hover:underline"
+                href={`/leads/${t.lead.id}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {t.lead.name}
+              </Link>
+            )}
+            <span className={`text-[11px] ${due.className}`}>{due.text}</span>
+          </span>
+        </span>
+
+        {showAssignee && t.user && (
+          <span className="flex shrink-0 items-center gap-1.5 pt-1">
+            <Avatar className="size-5">
+              <AvatarFallback className="bg-primary/10 text-[7px] text-primary">
+                {getInitials(t.user.name)}
+              </AvatarFallback>
+            </Avatar>
+          </span>
+        )}
+      </button>
+
+      {expanded && (
+        <div className="border-border/50 border-t px-3 pt-2 pb-3 pl-[42px]">
+          <TaskDetail onDelete={onDelete} task={t} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
 export function TasksPageClient() {
   const session = useSession();
   const currentUserId = session.data?.user?.id;
 
   const [viewMode, setViewMode] = useState<"mine" | "all">("mine");
   const [userFilter, setUserFilter] = useState<string>("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   let effectiveUserId: string | undefined;
   if (viewMode === "mine") {
@@ -158,15 +595,9 @@ export function TasksPageClient() {
   const { data: teamMembers = [] } = useTeamMembers();
   const toggleTask = useToggleTask();
   const deleteTaskMut = useDeleteTask();
-  const rescheduleTaskMut = useRescheduleTask();
-  const updateTaskMut = useUpdateTask();
 
   const [showCompleted, setShowCompleted] = useState(false);
   const [typeFilter, setTypeFilter] = useState("all");
-  const [editingTask, setEditingTask] = useState<TaskWithLead | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDue, setEditDue] = useState<Date | null>(null);
-  const [editType, setEditType] = useState("follow_up");
 
   let tasks = allTasks as TaskWithLead[];
   if (!showCompleted) {
@@ -189,25 +620,6 @@ export function TasksPageClient() {
       )
   );
   const completed = tasks.filter((t) => !!t.completedAt);
-
-  function openEdit(task: TaskWithLead) {
-    setEditingTask(task);
-    setEditTitle(task.title);
-    setEditDue(new Date(task.dueAt));
-    setEditType(task.type);
-  }
-
-  function handleSaveEdit() {
-    if (!(editingTask && editTitle.trim() && editDue)) {
-      return;
-    }
-    updateTaskMut.mutate({
-      id: editingTask.id,
-      data: { title: editTitle, dueAt: editDue, type: editType },
-      leadId: editingTask.leadId,
-    });
-    setEditingTask(null);
-  }
 
   const openCount = (allTasks as TaskWithLead[]).filter(
     (t) => !t.completedAt
@@ -238,185 +650,27 @@ export function TasksPageClient() {
           <span className="h-px flex-1 bg-border" />
         </h2>
         <div className="space-y-0.5">
-          {items.map((t) => {
-            const isComplete = !!t.completedAt;
-            const due = getDueLabel(new Date(t.dueAt), isComplete);
-            const showAssignee = viewMode === "all" && t.user;
-            return (
-              <div
-                className="group flex items-start gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-muted/40"
-                key={t.id}
-              >
-                <TaskCheckbox
-                  checked={isComplete}
-                  onChange={() =>
-                    toggleTask.mutate({
-                      id: t.id,
-                      isComplete,
-                      leadId: t.leadId,
-                    })
-                  }
-                />
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`text-sm leading-tight ${isComplete ? "text-muted-foreground line-through" : ""}`}
-                  >
-                    {t.title}
-                  </p>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    {t.lead && (
-                      <Link
-                        className="text-xs transition-colors hover:text-foreground hover:underline"
-                        href={`/leads/${t.lead.id}`}
-                      >
-                        {t.lead.name}
-                      </Link>
-                    )}
-                    {t.lead && <StatusBadge status={t.lead.status} />}
-                    <TaskTypeBadge type={t.type} />
-                    <RecurrenceBadge recurrence={t.recurrence} />
-                    {t.meetingLink && (
-                      <a
-                        className="inline-flex items-center gap-0.5 rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[9px] text-cyan-400 uppercase transition-colors hover:bg-cyan-500/25"
-                        href={t.meetingLink}
-                        onClick={(e) => e.stopPropagation()}
-                        rel="noopener noreferrer"
-                        target="_blank"
-                      >
-                        Join
-                      </a>
-                    )}
-                    <span className={`text-xs ${due.className}`}>
-                      {due.text}
-                    </span>
-                  </div>
-                </div>
-
-                {showAssignee && t.user && (
-                  <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
-                    <Avatar className="size-5">
-                      <AvatarFallback className="bg-primary/10 text-[7px] text-primary">
-                        {getInitials(t.user.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="hidden text-muted-foreground text-xs lg:inline">
-                      {t.user.name?.split(" ")[0]}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
-                  {!isComplete && (
-                    <Button
-                      onClick={() =>
-                        rescheduleTaskMut.mutate({
-                          id: t.id,
-                          days: 1,
-                          leadId: t.leadId,
-                        })
-                      }
-                      size="icon-sm"
-                      title="+1 day"
-                      variant="ghost"
-                    >
-                      <span className="font-mono text-[9px]">+1d</span>
-                    </Button>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={<Button size="icon-sm" variant="ghost" />}
-                    >
-                      <HugeiconsIcon
-                        icon={MoreHorizontalIcon}
-                        size={12}
-                        strokeWidth={1.5}
-                      />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEdit(t)}>
-                        <HugeiconsIcon
-                          icon={Edit02Icon}
-                          size={14}
-                          strokeWidth={1.5}
-                        />
-                        Edit
-                      </DropdownMenuItem>
-                      {!isComplete && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() =>
-                              rescheduleTaskMut.mutate({
-                                id: t.id,
-                                days: 1,
-                                leadId: t.leadId,
-                              })
-                            }
-                          >
-                            <HugeiconsIcon
-                              icon={Calendar01Icon}
-                              size={14}
-                              strokeWidth={1.5}
-                            />
-                            Tomorrow
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              rescheduleTaskMut.mutate({
-                                id: t.id,
-                                days: 3,
-                                leadId: t.leadId,
-                              })
-                            }
-                          >
-                            <HugeiconsIcon
-                              icon={Calendar01Icon}
-                              size={14}
-                              strokeWidth={1.5}
-                            />
-                            +3 days
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              rescheduleTaskMut.mutate({
-                                id: t.id,
-                                days: 7,
-                                leadId: t.leadId,
-                              })
-                            }
-                          >
-                            <HugeiconsIcon
-                              icon={Calendar01Icon}
-                              size={14}
-                              strokeWidth={1.5}
-                            />
-                            +1 week
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() =>
-                          deleteTaskMut.mutate({
-                            id: t.id,
-                            leadId: t.leadId,
-                          })
-                        }
-                        variant="destructive"
-                      >
-                        <HugeiconsIcon
-                          icon={Delete02Icon}
-                          size={14}
-                          strokeWidth={1.5}
-                        />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            );
-          })}
+          {items.map((t) => (
+            <TaskRow
+              expanded={expandedId === t.id}
+              key={t.id}
+              onDelete={() =>
+                deleteTaskMut.mutate({ id: t.id, leadId: t.leadId })
+              }
+              onToggleComplete={() =>
+                toggleTask.mutate({
+                  id: t.id,
+                  isComplete: !!t.completedAt,
+                  leadId: t.leadId,
+                })
+              }
+              onToggleExpand={() =>
+                setExpandedId(expandedId === t.id ? null : t.id)
+              }
+              showAssignee={viewMode === "all"}
+              task={t}
+            />
+          ))}
         </div>
       </div>
     );
@@ -440,7 +694,6 @@ export function TasksPageClient() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {/* My / All toggle */}
             <div className="flex rounded-md border bg-muted/30 p-0.5">
               <button
                 className={`rounded-sm px-2.5 py-1 text-xs transition-all ${
@@ -469,7 +722,6 @@ export function TasksPageClient() {
               </button>
             </div>
 
-            {/* User filter (only in All mode) */}
             {viewMode === "all" && teamMembers.length > 1 && (
               <Select
                 onValueChange={(v) => v && setUserFilter(v)}
@@ -486,12 +738,8 @@ export function TasksPageClient() {
                     {userFilter === "all"
                       ? "Everyone"
                       : ((
-                          teamMembers as Array<{
-                            id: string;
-                            name: string;
-                          }>
-                        ).find((m) => m.id === userFilter)?.name ??
-                        "Select...")}
+                          teamMembers as Array<{ id: string; name: string }>
+                        ).find((m) => m.id === userFilter)?.name ?? "Select…")}
                   </span>
                 </SelectTrigger>
                 <SelectContent>
@@ -549,9 +797,7 @@ export function TasksPageClient() {
               size={36}
               strokeWidth={1}
             />
-            <p className="text-sm">
-              {getEmptyMessage(typeFilter, showCompleted)}
-            </p>
+            <p className="text-sm">{emptyMessage(typeFilter, showCompleted)}</p>
           </div>
         )}
 
@@ -563,47 +809,6 @@ export function TasksPageClient() {
             renderSection("Completed", completed, "text-muted-foreground")}
         </div>
       </div>
-
-      {/* Edit dialog */}
-      <Dialog
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingTask(null);
-          }
-        }}
-        open={!!editingTask}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Edit Task</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <Input
-              autoFocus
-              onChange={(e) => setEditTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleSaveEdit();
-                }
-              }}
-              placeholder="Task title"
-              value={editTitle}
-            />
-            <TaskTypePicker
-              className="w-full"
-              onChange={setEditType}
-              value={editType}
-            />
-            <DateTimePicker onChange={setEditDue} value={editDue} />
-          </div>
-          <DialogFooter>
-            <Button onClick={handleSaveEdit} size="sm">
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

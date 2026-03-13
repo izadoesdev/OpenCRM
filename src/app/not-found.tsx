@@ -30,7 +30,7 @@ export default function NotFound() {
 
         <Button render={<Link href="/" />}>
           <HugeiconsIcon icon={Target01Icon} size={16} strokeWidth={1.5} />
-          Back to DataCRM
+          Back to OpenCRM
         </Button>
       </div>
     </div>
