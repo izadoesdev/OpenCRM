@@ -167,7 +167,7 @@ export function LeadFormDialog({
                 value={email}
               />
               {duplicateCheck?.data && !lead && (
-                <p className="text-amber-400 text-xs">
+                <p className="text-amber-600 text-xs">
                   A lead with this email already exists:{" "}
                   {duplicateCheck.data.name} ({duplicateCheck.data.status})
                 </p>

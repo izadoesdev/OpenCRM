@@ -22,17 +22,17 @@ const RSVP_CONFIG: Record<
   accepted: {
     icon: CheckmarkCircle01Icon,
     label: "Accepted",
-    className: "text-emerald-400",
+    className: "text-emerald-600",
   },
   declined: {
     icon: Cancel01Icon,
     label: "Declined",
-    className: "text-red-400",
+    className: "text-red-600",
   },
   tentative: {
     icon: HelpCircleIcon,
     label: "Maybe",
-    className: "text-amber-400",
+    className: "text-amber-600",
   },
   needsAction: {
     icon: Mail01Icon,
@@ -171,7 +171,7 @@ export function MeetingLinkBadge({ href }: { href: string }) {
   const isGoogleMeet = href.includes("meet.google");
   return (
     <a
-      className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2.5 py-1 text-emerald-400 text-xs transition-colors hover:bg-emerald-500/20"
+      className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 text-emerald-700 text-xs transition-colors hover:bg-emerald-100"
       href={href}
       rel="noopener noreferrer"
       target="_blank"
@@ -182,7 +182,7 @@ export function MeetingLinkBadge({ href }: { href: string }) {
         strokeWidth={1.5}
       />
       Join Meeting
-      {isGoogleMeet && <span className="text-emerald-400/60">Google Meet</span>}
+      {isGoogleMeet && <span className="text-emerald-600/60">Google Meet</span>}
     </a>
   );
 }
@@ -196,7 +196,7 @@ export function MeetingLinkPill({
 }) {
   return (
     <a
-      className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400 transition-colors hover:bg-emerald-500/20"
+      className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700 transition-colors hover:bg-emerald-100"
       href={href}
       onClick={onClick}
       rel="noopener noreferrer"

@@ -121,7 +121,7 @@ export function RecurrenceBadge({ recurrence }: { recurrence: string | null }) {
     return null;
   }
   return (
-    <span className="inline-flex items-center gap-0.5 rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[9px] text-violet-400 uppercase">
+    <span className="inline-flex items-center gap-0.5 rounded-md bg-violet-50 px-1.5 py-0.5 text-[9px] text-violet-700 uppercase">
       <HugeiconsIcon icon={RepeatIcon} size={8} strokeWidth={2} />
       {RECURRENCE_LABELS[recurrence] ?? recurrence}
     </span>

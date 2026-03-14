@@ -213,7 +213,7 @@ function TaskDetail({
           Edit
         </Button>
         <Button
-          className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+          className="text-red-600 hover:bg-red-50 hover:text-red-700"
           onClick={onDelete}
           size="sm"
           variant="ghost"
@@ -278,7 +278,7 @@ function TaskRow({
             )}
             {t.type === "call" && !expanded && t.lead && (
               <a
-                className="shrink-0 rounded-sm bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-400 transition-colors hover:bg-blue-500/20"
+                className="shrink-0 rounded-sm bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700 transition-colors hover:bg-blue-100"
                 href={`tel:${t.lead?.phone ?? ""}`}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -287,7 +287,7 @@ function TaskRow({
             )}
             {t.type === "email" && !expanded && t.lead && (
               <Link
-                className="shrink-0 rounded-sm bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-400 transition-colors hover:bg-violet-500/20"
+                className="shrink-0 rounded-sm bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700 transition-colors hover:bg-violet-100"
                 href={`/leads/${t.lead.id}`}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -296,7 +296,7 @@ function TaskRow({
             )}
             {t.type === "linkedin" && !expanded && (
               <a
-                className="shrink-0 rounded-sm bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-400 transition-colors hover:bg-sky-500/20"
+                className="shrink-0 rounded-sm bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700 transition-colors hover:bg-sky-100"
                 href="https://linkedin.com"
                 onClick={(e) => e.stopPropagation()}
                 rel="noopener noreferrer"
@@ -713,8 +713,8 @@ export function TasksPageClient() {
         )}
 
         <div className="mx-auto max-w-2xl space-y-6">
-          {renderSection("Overdue", overdue, "text-red-400")}
-          {renderSection("Today", today, "text-amber-400")}
+          {renderSection("Overdue", overdue, "text-red-600")}
+          {renderSection("Today", today, "text-amber-600")}
           {renderSection("Upcoming", upcoming)}
           {showCompleted &&
             renderSection("Completed", completed, "text-muted-foreground")}

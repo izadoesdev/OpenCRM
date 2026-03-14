@@ -382,8 +382,8 @@ function EmailThreadView({
                             <span
                               className={`flex size-5 shrink-0 items-center justify-center rounded-full font-bold text-[8px] ${
                                 received
-                                  ? "bg-amber-500/20 text-amber-500"
-                                  : "bg-primary/15 text-primary"
+                                  ? "bg-amber-50 text-amber-700"
+                                  : "bg-primary/10 text-primary"
                               }`}
                             >
                               {sender.charAt(0).toUpperCase()}
@@ -1563,7 +1563,7 @@ function LeadTaskDetail({
           Edit
         </Button>
         <Button
-          className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+          className="text-red-600 hover:bg-red-50 hover:text-red-700"
           onClick={onDelete}
           size="sm"
           variant="ghost"
@@ -1644,7 +1644,7 @@ function LeadTaskRow({
             )}
             {t.type === "call" && !expanded && leadPhone && (
               <a
-                className="shrink-0 rounded-sm bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-400 transition-colors hover:bg-blue-500/20"
+                className="shrink-0 rounded-sm bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700 transition-colors hover:bg-blue-100"
                 href={`tel:${leadPhone}`}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -1653,7 +1653,7 @@ function LeadTaskRow({
             )}
             {t.type === "email" && !expanded && (
               <Link
-                className="shrink-0 rounded-sm bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-400 transition-colors hover:bg-violet-500/20"
+                className="shrink-0 rounded-sm bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700 transition-colors hover:bg-violet-100"
                 href={`/leads/${leadId}`}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -1662,7 +1662,7 @@ function LeadTaskRow({
             )}
             {t.type === "linkedin" && !expanded && (
               <a
-                className="shrink-0 rounded-sm bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-400 transition-colors hover:bg-sky-500/20"
+                className="shrink-0 rounded-sm bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700 transition-colors hover:bg-sky-100"
                 href="https://linkedin.com"
                 onClick={(e) => e.stopPropagation()}
                 rel="noopener noreferrer"
@@ -1676,7 +1676,7 @@ function LeadTaskRow({
             <TaskTypeBadge type={t.type} />
             <RecurrenceBadge recurrence={t.recurrence} />
             <span
-              className={`text-[11px] ${overdue ? "text-red-400" : "text-muted-foreground"}`}
+              className={`text-[11px] ${overdue ? "text-red-600" : "text-muted-foreground"}`}
             >
               {dayjs(t.dueAt).format("h:mm A")} · {dayjs(t.dueAt).fromNow()}
             </span>

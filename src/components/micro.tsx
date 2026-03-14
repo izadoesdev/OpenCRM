@@ -30,10 +30,10 @@ export function SectionHeader({
 
 const PILL_VARIANTS = {
   muted: "bg-muted text-muted-foreground",
-  danger: "bg-red-500/15 text-red-400",
-  success: "bg-emerald-500/15 text-emerald-400",
+  danger: "bg-red-50 text-red-700",
+  success: "bg-emerald-50 text-emerald-700",
   primary: "bg-primary/10 text-primary",
-  violet: "bg-violet-500/15 text-violet-400",
+  violet: "bg-violet-50 text-violet-700",
 } as const;
 
 export function Pill({

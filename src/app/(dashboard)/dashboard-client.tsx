@@ -187,13 +187,13 @@ export function DashboardClient() {
             <div className="mt-3 space-y-4">
               <TaskSection
                 label="Overdue"
-                labelClass="text-red-400"
+                labelClass="text-red-600"
                 onToggle={toggleTask}
                 tasks={overdueTasks}
               />
               <TaskSection
                 label="Today"
-                labelClass="text-amber-400"
+                labelClass="text-amber-600"
                 onToggle={toggleTask}
                 tasks={todayTasks}
               />

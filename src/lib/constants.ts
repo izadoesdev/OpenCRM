@@ -52,14 +52,14 @@ export const STATUS_LABELS: Record<string, string> = {
 };
 
 export const STATUS_COLORS: Record<string, string> = {
-  new: "bg-blue-500/20 text-blue-300",
-  contacted: "bg-violet-500/20 text-violet-300",
-  interested: "bg-amber-500/20 text-amber-300",
-  demo: "bg-cyan-500/20 text-cyan-300",
-  negotiating: "bg-orange-500/20 text-orange-300",
-  converted: "bg-emerald-500/20 text-emerald-300",
-  lost: "bg-red-500/20 text-red-300",
-  churned: "bg-zinc-500/20 text-zinc-300",
+  new: "bg-blue-50 text-blue-700",
+  contacted: "bg-violet-50 text-violet-700",
+  interested: "bg-amber-50 text-amber-700",
+  demo: "bg-cyan-50 text-cyan-700",
+  negotiating: "bg-orange-50 text-orange-700",
+  converted: "bg-emerald-50 text-emerald-700",
+  lost: "bg-red-50 text-red-700",
+  churned: "bg-zinc-100 text-zinc-500",
 };
 
 export const SOURCE_LABELS: Record<string, string> = {
@@ -82,13 +82,13 @@ export const TASK_TYPE_LABELS: Record<string, string> = {
 };
 
 export const TASK_TYPE_COLORS: Record<string, string> = {
-  follow_up: "bg-blue-500/20 text-blue-300",
-  call: "bg-amber-500/20 text-amber-300",
-  email: "bg-emerald-500/20 text-emerald-300",
-  meeting: "bg-violet-500/20 text-violet-300",
-  demo: "bg-cyan-500/20 text-cyan-300",
-  linkedin: "bg-sky-500/20 text-sky-300",
-  other: "bg-zinc-500/20 text-zinc-300",
+  follow_up: "bg-blue-50 text-blue-700",
+  call: "bg-amber-50 text-amber-700",
+  email: "bg-emerald-50 text-emerald-700",
+  meeting: "bg-violet-50 text-violet-700",
+  demo: "bg-cyan-50 text-cyan-700",
+  linkedin: "bg-sky-50 text-sky-700",
+  other: "bg-zinc-100 text-zinc-600",
 };
 
 export const STATUS_DOT_COLORS: Record<string, string> = {
@@ -103,14 +103,14 @@ export const STATUS_DOT_COLORS: Record<string, string> = {
 };
 
 export const STATUS_TEXT_COLORS: Record<string, string> = {
-  new: "text-blue-300",
-  contacted: "text-violet-300",
-  interested: "text-amber-300",
-  demo: "text-cyan-300",
-  negotiating: "text-orange-300",
-  converted: "text-emerald-300",
-  lost: "text-red-300",
-  churned: "text-zinc-300",
+  new: "text-blue-600",
+  contacted: "text-violet-600",
+  interested: "text-amber-600",
+  demo: "text-cyan-600",
+  negotiating: "text-orange-600",
+  converted: "text-emerald-600",
+  lost: "text-red-600",
+  churned: "text-zinc-500",
 };
 
 export const TASK_RECURRENCES = [

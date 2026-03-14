@@ -107,22 +107,22 @@ export function computeLeadScoreBreakdown(input: ScoringInput): ScoreBreakdown {
 
 export function getScoreColor(score: number): string {
   if (score >= 70) {
-    return "text-emerald-300";
+    return "text-emerald-600";
   }
   if (score >= 40) {
-    return "text-amber-300";
+    return "text-amber-600";
   }
-  return "text-red-300";
+  return "text-red-600";
 }
 
 export function getScoreBgColor(score: number): string {
   if (score >= 70) {
-    return "bg-emerald-500/20 text-emerald-300";
+    return "bg-emerald-50 text-emerald-700";
   }
   if (score >= 40) {
-    return "bg-amber-500/20 text-amber-300";
+    return "bg-amber-50 text-amber-700";
   }
-  return "bg-red-500/20 text-red-300";
+  return "bg-red-50 text-red-700";
 }
 
 export function getScoreLabel(score: number): string {

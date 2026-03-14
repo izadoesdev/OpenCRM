@@ -153,7 +153,7 @@ export function SettingsClient() {
                     />
                   </Button>
                   <Button
-                    className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
                     onClick={() => deleteMut.mutate(t.id)}
                     size="icon-sm"
                     variant="ghost"
@@ -217,7 +217,7 @@ export function SettingsClient() {
                         Restore
                       </Button>
                       <Button
-                        className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
                         disabled={
                           restoreLead.isPending || permanentlyDelete.isPending
                         }

@@ -19,7 +19,7 @@ export function TaskCheckbox({
       className={`mt-0.5 flex ${px} shrink-0 cursor-pointer items-center justify-center rounded-[5px] border transition-all duration-150 ${
         checked
           ? "border-emerald-500 bg-emerald-500 text-white"
-          : "border-muted-foreground/30 hover:border-emerald-500/50 hover:bg-emerald-500/10"
+          : "border-muted-foreground/30 hover:border-emerald-500/50 hover:bg-emerald-50"
       }`}
       onClick={onChange}
       type="button"

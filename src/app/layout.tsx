@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 
-const dmSans = DM_Sans({
-  variable: "--font-dm-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
@@ -28,13 +28,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      className={`${dmSans.variable} ${jetbrainsMono.variable} dark`}
-      lang="en"
-    >
+    <html className={`${inter.variable} ${jetbrainsMono.variable}`} lang="en">
       <body className="antialiased">
         <TooltipProvider>{children}</TooltipProvider>
-        <Toaster position="bottom-right" theme="dark" />
+        <Toaster position="bottom-right" theme="light" />
       </body>
     </html>
   );

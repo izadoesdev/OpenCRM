@@ -186,14 +186,14 @@ export function ReportingClient() {
           <div className="grid grid-cols-2 gap-px border-b bg-border sm:grid-cols-4">
             <div className="bg-background p-5">
               <StatCard
-                accent="text-blue-400"
+                accent="text-blue-600"
                 label="Total Leads"
                 value={totalLeads}
               />
             </div>
             <div className="bg-background p-5">
               <StatCard
-                accent="text-emerald-400"
+                accent="text-emerald-600"
                 label="Converted"
                 sub={`${convRate}% conversion rate`}
                 value={convertedCount}
@@ -201,7 +201,7 @@ export function ReportingClient() {
             </div>
             <div className="bg-background p-5">
               <StatCard
-                accent="text-amber-400"
+                accent="text-amber-600"
                 label="In Pipeline"
                 sub="active stages"
                 value={
@@ -215,7 +215,7 @@ export function ReportingClient() {
             </div>
             <div className="bg-background p-5">
               <StatCard
-                accent="text-red-400"
+                accent="text-red-600"
                 label="Lost"
                 sub={
                   totalLeads > 0
