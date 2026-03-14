@@ -17,6 +17,7 @@ import { headers } from "next/headers";
 import { db } from "@/db";
 import { activity, lead, task } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import dayjs from "@/lib/dayjs";
 
 async function getUser() {
   const session = await auth.api.getSession({
@@ -154,7 +155,10 @@ export async function updateLead(
 
 export async function deleteLead(id: string) {
   await getUser();
-  await db.update(lead).set({ archivedAt: new Date() }).where(eq(lead.id, id));
+  await db
+    .update(lead)
+    .set({ archivedAt: dayjs().toDate() })
+    .where(eq(lead.id, id));
   revalidatePath("/leads");
   revalidatePath("/pipeline");
   revalidatePath("/");
@@ -183,7 +187,7 @@ export async function bulkDeleteLeads(ids: string[]) {
   await getUser();
   await db
     .update(lead)
-    .set({ archivedAt: new Date() })
+    .set({ archivedAt: dayjs().toDate() })
     .where(inArray(lead.id, ids));
   revalidatePath("/leads");
   revalidatePath("/pipeline");

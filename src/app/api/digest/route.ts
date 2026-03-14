@@ -12,7 +12,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const now = new Date();
+  const now = dayjs().toDate();
 
   const overdueTasks = await db.query.task.findMany({
     where: and(isNull(task.completedAt), lte(task.dueAt, now)),

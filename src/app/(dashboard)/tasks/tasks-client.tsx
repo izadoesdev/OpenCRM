@@ -245,7 +245,7 @@ function TaskRow({
   showAssignee: boolean;
 }) {
   const isComplete = !!t.completedAt;
-  const due = getDueLabel(new Date(t.dueAt), isComplete);
+  const due = getDueLabel(dayjs(t.dueAt).toDate(), isComplete);
   const showJoin = isMeetingType(t.type) && t.meetingLink && !expanded;
 
   return (

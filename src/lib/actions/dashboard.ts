@@ -16,6 +16,7 @@ import { headers } from "next/headers";
 import { db } from "@/db";
 import { activity, lead, task } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import dayjs from "@/lib/dayjs";
 
 async function getUser() {
   const session = await auth.api.getSession({
@@ -30,10 +31,10 @@ async function getUser() {
 function getDateFilter(opts?: { from?: string; to?: string }) {
   const dateConditions: ReturnType<typeof gte>[] = [];
   if (opts?.from) {
-    dateConditions.push(gte(lead.createdAt, new Date(opts.from)));
+    dateConditions.push(gte(lead.createdAt, dayjs(opts.from).toDate()));
   }
   if (opts?.to) {
-    dateConditions.push(lte(lead.createdAt, new Date(opts.to)));
+    dateConditions.push(lte(lead.createdAt, dayjs(opts.to).toDate()));
   }
   return dateConditions.length > 0 ? and(...dateConditions) : undefined;
 }
@@ -160,7 +161,7 @@ export async function getPipelineVelocity() {
     }
     leadTimelines[sc.leadId].push({
       status: meta.newStatus,
-      at: new Date(sc.createdAt),
+      at: dayjs(sc.createdAt).toDate(),
     });
   }
 
@@ -202,10 +203,10 @@ export async function getStatusChangeHistory(opts?: {
   ];
 
   if (opts?.from) {
-    conditions.push(gte(activity.createdAt, new Date(opts.from)));
+    conditions.push(gte(activity.createdAt, dayjs(opts.from).toDate()));
   }
   if (opts?.to) {
-    conditions.push(lte(activity.createdAt, new Date(opts.to)));
+    conditions.push(lte(activity.createdAt, dayjs(opts.to).toDate()));
   }
 
   const rows = await db.query.activity.findMany({
@@ -244,8 +245,7 @@ export async function getReportingData() {
     .from(lead)
     .groupBy(lead.source);
 
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const sixMonthsAgo = dayjs().subtract(6, "month").toDate();
 
   const monthlyLeads = await db
     .select({

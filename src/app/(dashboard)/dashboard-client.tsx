@@ -47,7 +47,7 @@ export function DashboardClient() {
       return undefined;
     }
     const now = dayjs();
-    let from: dayjs.Dayjs;
+    let from: ReturnType<typeof dayjs>;
     if (dateRange === "week") {
       from = now.subtract(7, "day");
     } else if (dateRange === "month") {
@@ -416,7 +416,7 @@ function DashboardTaskRow({
   onToggle: ReturnType<typeof useToggleTask>;
 }) {
   const isComplete = !!t.completedAt;
-  const due = getDueLabel(new Date(t.dueAt), isComplete);
+  const due = getDueLabel(dayjs(t.dueAt).toDate(), isComplete);
 
   return (
     <Link

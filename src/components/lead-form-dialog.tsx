@@ -85,7 +85,7 @@ export function LeadFormDialog({
       setCompany(lead?.company ?? "");
       setTitle(lead?.title ?? "");
       setPhone(lead?.phone ?? "");
-      setWebsite(lead?.website ?? "");
+      setWebsite((lead?.website ?? "").replace(/^https?:\/\//, ""));
       setSource(lead?.source ?? "manual");
       setValueDollars(lead?.value ? (lead.value / 100).toString() : "");
     }
@@ -103,7 +103,7 @@ export function LeadFormDialog({
       company: company || undefined,
       title: title || undefined,
       phone: phone || undefined,
-      website: website || undefined,
+      website: website ? `https://${website}` : undefined,
       source,
       value: cents,
     };
@@ -142,14 +142,13 @@ export function LeadFormDialog({
                 className="text-muted-foreground text-xs"
                 htmlFor="lead-name"
               >
-                Name *
+                Name
               </label>
               <Input
                 autoFocus
                 id="lead-name"
                 onChange={(e) => setName(e.target.value)}
                 placeholder="John Doe"
-                required
                 value={name}
               />
             </div>
@@ -158,13 +157,12 @@ export function LeadFormDialog({
                 className="text-muted-foreground text-xs"
                 htmlFor="lead-email"
               >
-                Email *
+                Email
               </label>
               <Input
                 id="lead-email"
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="john@company.com"
-                required
                 type="email"
                 value={email}
               />
@@ -205,11 +203,7 @@ export function LeadFormDialog({
                     if (!v) {
                       return;
                     }
-                    if (v === "__custom__") {
-                      setTitle("");
-                    } else {
-                      setTitle(v);
-                    }
+                    setTitle(v === "__custom__" ? "" : v);
                   }}
                   value={title || undefined}
                 >
@@ -258,59 +252,66 @@ export function LeadFormDialog({
               >
                 Website
               </label>
-              <Input
-                id="lead-website"
-                onChange={(e) => setWebsite(e.target.value)}
-                placeholder="https://company.com"
-                type="url"
-                value={website}
-              />
+              <div className="relative">
+                <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground text-sm">
+                  https://
+                </span>
+                <Input
+                  className="pl-[60px]"
+                  id="lead-website"
+                  onChange={(e) =>
+                    setWebsite(e.target.value.replace(/^https?:\/\//, ""))
+                  }
+                  placeholder="company.com"
+                  value={website}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label
-              className="text-muted-foreground text-xs"
-              htmlFor="lead-source"
-            >
-              Source
-            </label>
-            <Select onValueChange={(v) => v && setSource(v)} value={source}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {LEAD_SOURCES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {SOURCE_LABELS[s]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label
-              className="text-muted-foreground text-xs"
-              htmlFor="lead-value"
-            >
-              Deal Value ($)
-            </label>
-            <div className="relative">
-              <span className="absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground text-sm">
-                $
-              </span>
-              <Input
-                className="pl-7"
-                id="lead-value"
-                max="21000000"
-                min="0"
-                onChange={(e) => setValueDollars(e.target.value)}
-                placeholder="0.00"
-                step="0.01"
-                type="number"
-                value={valueDollars}
-              />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label
+                className="text-muted-foreground text-xs"
+                htmlFor="lead-source"
+              >
+                Source
+              </label>
+              <Select onValueChange={(v) => v && setSource(v)} value={source}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LEAD_SOURCES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {SOURCE_LABELS[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label
+                className="text-muted-foreground text-xs"
+                htmlFor="lead-value"
+              >
+                Deal Value
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground text-sm">
+                  $
+                </span>
+                <Input
+                  className="pl-7"
+                  id="lead-value"
+                  min="0"
+                  onChange={(e) => setValueDollars(e.target.value)}
+                  placeholder="0.00"
+                  step="0.01"
+                  type="number"
+                  value={valueDollars}
+                />
+              </div>
             </div>
           </div>
 

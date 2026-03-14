@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { db } from "@/db";
 import { account } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import dayjs from "@/lib/dayjs";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
@@ -52,7 +53,7 @@ async function refreshAccessToken(acct: typeof account.$inferSelect) {
   }
 
   const data = await res.json();
-  const expiresAt = new Date(Date.now() + data.expires_in * 1000);
+  const expiresAt = dayjs().add(data.expires_in, "second").toDate();
 
   await db
     .update(account)
@@ -71,7 +72,7 @@ export async function getGoogleToken(): Promise<string> {
 
   const needsRefresh =
     !(acct.accessToken && acct.accessTokenExpiresAt) ||
-    acct.accessTokenExpiresAt.getTime() - Date.now() < REFRESH_BUFFER_MS;
+    acct.accessTokenExpiresAt.getTime() - dayjs().valueOf() < REFRESH_BUFFER_MS;
 
   if (needsRefresh) {
     return refreshAccessToken(acct);

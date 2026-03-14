@@ -48,6 +48,7 @@ import {
 } from "@/lib/actions/tasks";
 import { getTeamMembers } from "@/lib/actions/team";
 import { STATUS_LABELS } from "@/lib/constants";
+import dayjs from "@/lib/dayjs";
 import {
   getCalendarEvent,
   getUpcomingCalendarEvents,
@@ -570,7 +571,7 @@ export function useToggleTask() {
           }
           return old.map((t) =>
             t.id === id
-              ? { ...t, completedAt: isComplete ? null : new Date() }
+              ? { ...t, completedAt: isComplete ? null : dayjs().toDate() }
               : t
           );
         }

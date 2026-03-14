@@ -6,6 +6,7 @@ import { TaskTypePicker } from "@/components/task-type-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import dayjs from "@/lib/dayjs";
 import { useUpdateTask } from "@/lib/queries";
 
 interface EditableTask {
@@ -28,7 +29,7 @@ export function TaskInlineEdit({
   const updateTask = useUpdateTask();
   const [title, setTitle] = useState(t.title);
   const [description, setDescription] = useState(t.description ?? "");
-  const [dueAt, setDueAt] = useState<Date | null>(new Date(t.dueAt));
+  const [dueAt, setDueAt] = useState<Date | null>(dayjs(t.dueAt).toDate());
   const [type, setType] = useState(t.type);
 
   function handleSave() {

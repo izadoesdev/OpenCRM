@@ -33,9 +33,9 @@ export async function createCalendarEvent(data: {
   attendeeEmails?: string[];
   addMeetLink?: boolean;
 }): Promise<{ eventId: string; meetLink: string | null; htmlLink: string }> {
-  const startIso = data.startTime.toISOString();
-  const endIso = (
-    data.endTime ?? dayjs(data.startTime).add(1, "hour").toDate()
+  const startIso = dayjs(data.startTime).toISOString();
+  const endIso = dayjs(
+    data.endTime ?? dayjs(data.startTime).add(1, "hour")
   ).toISOString();
 
   const body: Record<string, unknown> = {
@@ -80,7 +80,7 @@ export async function createCalendarEvent(data: {
 export async function getUpcomingCalendarEvents(opts?: {
   maxResults?: number;
 }): Promise<CalendarEvent[]> {
-  const now = new Date().toISOString();
+  const now = dayjs().toISOString();
   const params = new URLSearchParams({
     timeMin: now,
     maxResults: String(opts?.maxResults ?? 10),
@@ -113,10 +113,10 @@ export async function updateCalendarEvent(
     body.description = data.description;
   }
   if (data.startTime) {
-    body.start = { dateTime: data.startTime.toISOString() };
+    body.start = { dateTime: dayjs(data.startTime).toISOString() };
     body.end = {
-      dateTime: (
-        data.endTime ?? dayjs(data.startTime).add(1, "hour").toDate()
+      dateTime: dayjs(
+        data.endTime ?? dayjs(data.startTime).add(1, "hour")
       ).toISOString(),
     };
   }

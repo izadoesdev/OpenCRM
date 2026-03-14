@@ -270,7 +270,7 @@ export async function completeTask(id: string) {
 
   const [row] = await db
     .update(task)
-    .set({ completedAt: new Date() })
+    .set({ completedAt: dayjs().toDate() })
     .where(eq(task.id, id))
     .returning();
 
@@ -283,7 +283,8 @@ export async function completeTask(id: string) {
   }
 
   if (existing.recurrence) {
-    const base = existing.dueAt < new Date() ? new Date() : existing.dueAt;
+    const now = dayjs().toDate();
+    const base = existing.dueAt < now ? now : existing.dueAt;
     const nextDue = nextDueDate(base, existing.recurrence);
     await createRecurringFollowUp(existing, nextDue);
   }
@@ -354,7 +355,8 @@ export async function rescheduleTask(id: string, days: number) {
     throw new Error("Task not found");
   }
 
-  const baseDate = existing.dueAt < new Date() ? new Date() : existing.dueAt;
+  const nowDate = dayjs().toDate();
+  const baseDate = existing.dueAt < nowDate ? nowDate : existing.dueAt;
   const newDue = dayjs(baseDate).add(days, "day").toDate();
 
   const [row] = await db
@@ -441,7 +443,7 @@ export async function deleteTask(id: string) {
 export async function getOverdueTasks() {
   await getUser();
   return db.query.task.findMany({
-    where: and(isNull(task.completedAt), lte(task.dueAt, new Date())),
+    where: and(isNull(task.completedAt), lte(task.dueAt, dayjs().toDate())),
     orderBy: [asc(task.dueAt)],
     with: { lead: true, user: true },
   });

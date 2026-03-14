@@ -39,16 +39,16 @@ export async function changeLeadStatus(
   const updates: Record<string, unknown> = { status: newStatus };
 
   if (newStatus === "converted") {
-    updates.convertedAt = new Date();
+    updates.convertedAt = dayjs().toDate();
     if (opts?.plan) {
       updates.plan = opts.plan;
     }
   }
   if (newStatus === "lost") {
-    updates.lostAt = new Date();
+    updates.lostAt = dayjs().toDate();
   }
   if (newStatus === "churned") {
-    updates.churnedAt = new Date();
+    updates.churnedAt = dayjs().toDate();
   }
 
   await db.update(lead).set(updates).where(eq(lead.id, leadId));

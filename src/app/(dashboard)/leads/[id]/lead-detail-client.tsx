@@ -750,9 +750,9 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                       status: lead.status,
                       activitiesCount: lead.activities?.length ?? 0,
                       tasksCount: lead.tasks?.length ?? 0,
-                      daysSinceCreated: Math.floor(
-                        (Date.now() - new Date(lead.createdAt).getTime()) /
-                          (1000 * 60 * 60 * 24)
+                      daysSinceCreated: dayjs().diff(
+                        dayjs(lead.createdAt),
+                        "day"
                       ),
                     });
                     return (

@@ -150,7 +150,7 @@ export function EmailComposeDialog({
                 className="text-muted-foreground text-xs"
                 htmlFor="email-subject"
               >
-                Subject *
+                Subject
               </label>
               {!showCcBcc && (
                 <button
@@ -167,7 +167,6 @@ export function EmailComposeDialog({
               id="email-subject"
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Re: Following up"
-              required
               value={subject}
             />
           </div>
@@ -210,14 +209,13 @@ export function EmailComposeDialog({
               className="text-muted-foreground text-xs"
               htmlFor="email-body"
             >
-              Body *
+              Body
             </label>
             <Textarea
               className="min-h-[120px]"
               id="email-body"
               onChange={(e) => setBody(e.target.value)}
               placeholder={"Hi {{name}},\n\n..."}
-              required
               value={body}
             />
             <p className="text-[10px] text-muted-foreground">

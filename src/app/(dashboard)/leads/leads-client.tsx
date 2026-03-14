@@ -420,25 +420,20 @@ export function LeadsPageClient() {
           status: a.status,
           activitiesCount: 0,
           tasksCount: 0,
-          daysSinceCreated: Math.floor(
-            (Date.now() - new Date(a.createdAt).getTime()) / 86_400_000
-          ),
+          daysSinceCreated: dayjs().diff(dayjs(a.createdAt), "day"),
         });
         const scoreB = computeLeadScore({
           value: b.value,
           status: b.status,
           activitiesCount: 0,
           tasksCount: 0,
-          daysSinceCreated: Math.floor(
-            (Date.now() - new Date(b.createdAt).getTime()) / 86_400_000
-          ),
+          daysSinceCreated: dayjs().diff(dayjs(b.createdAt), "day"),
         });
         return mult * (scoreA - scoreB);
       }
       case "createdAt":
         return (
-          mult *
-          (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+          mult * (dayjs(a.createdAt).valueOf() - dayjs(b.createdAt).valueOf())
         );
       default:
         return 0;
@@ -476,7 +471,7 @@ export function LeadsPageClient() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `leads-${dayjs().format("YYYY-MM-DD")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -793,9 +788,9 @@ export function LeadsPageClient() {
                         status: lead.status,
                         activitiesCount: 0,
                         tasksCount: 0,
-                        daysSinceCreated: Math.floor(
-                          (Date.now() - new Date(lead.createdAt).getTime()) /
-                            (1000 * 60 * 60 * 24)
+                        daysSinceCreated: dayjs().diff(
+                          dayjs(lead.createdAt),
+                          "day"
                         ),
                       });
                       return (
