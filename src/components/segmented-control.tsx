@@ -25,7 +25,7 @@ export function SegmentedControl<T extends string>({
           className={cn(
             "rounded-sm px-2.5 py-1 text-xs transition-all",
             value === s.value
-              ? "bg-background font-medium shadow-sm"
+              ? "bg-background font-medium"
               : "text-muted-foreground hover:text-foreground"
           )}
           key={s.value}

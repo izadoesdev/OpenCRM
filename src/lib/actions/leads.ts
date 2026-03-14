@@ -15,7 +15,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { db } from "@/db";
-import { activity, lead, task } from "@/db/schema";
+import { activity, lead, task, user as userTable } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import dayjs from "@/lib/dayjs";
 
@@ -112,9 +112,9 @@ export async function createLead(data: {
   await db.insert(activity).values({
     leadId: row.id,
     userId: user.id,
-    type: "status_change",
-    content: "Lead created",
-    metadata: { newStatus: "new" },
+    type: "lead_created",
+    content: `Added ${data.name}`,
+    metadata: { source: data.source ?? "manual" },
   });
 
   revalidatePath("/leads");
@@ -139,12 +139,49 @@ export async function updateLead(
     customFields: Record<string, string>;
   }>
 ) {
-  await getUser();
+  const user = await getUser();
+
+  const existing =
+    data.assignedTo !== undefined
+      ? await db.query.lead.findFirst({
+          where: eq(lead.id, id),
+          with: { assignedUser: true },
+        })
+      : null;
+
   const [row] = await db
     .update(lead)
     .set(data)
     .where(eq(lead.id, id))
     .returning();
+
+  if (data.assignedTo !== undefined && existing) {
+    const prevName = existing.assignedUser?.name ?? null;
+    if (data.assignedTo) {
+      const newAssignee = await db.query.user.findFirst({
+        where: eq(userTable.id, data.assignedTo),
+        columns: { name: true },
+      });
+      await db.insert(activity).values({
+        leadId: id,
+        userId: user.id,
+        type: "assignment_changed",
+        content: `Assigned to ${newAssignee?.name ?? "a team member"}`,
+        metadata: {
+          previousAssignee: prevName,
+          newAssignee: newAssignee?.name ?? data.assignedTo,
+        },
+      });
+    } else {
+      await db.insert(activity).values({
+        leadId: id,
+        userId: user.id,
+        type: "assignment_changed",
+        content: "Unassigned",
+        metadata: { previousAssignee: prevName, newAssignee: null },
+      });
+    }
+  }
 
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);

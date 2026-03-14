@@ -1,11 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Pill, UserAvatar } from "@/components/micro";
+import { Pill } from "@/components/micro";
 import { PageHeader } from "@/components/page-header";
-import { EmptyState, PageSkeleton } from "@/components/page-skeleton";
-import { SegmentedControl } from "@/components/segmented-control";
-import { StatusBadge } from "@/components/status-badge";
+import { PageSkeleton } from "@/components/page-skeleton";
 import {
   ACTIVE_LEAD_STATUSES,
   SOURCE_LABELS,
@@ -13,24 +10,15 @@ import {
   STATUS_LABELS,
   STATUS_TEXT_COLORS,
 } from "@/lib/constants";
-import dayjs from "@/lib/dayjs";
+import { usePipelineVelocity, useReportingData } from "@/lib/queries";
 import {
-  usePipelineVelocity,
-  useReportingData,
-  useStatusChangeHistory,
-} from "@/lib/queries";
-
-type AuditRange = "7d" | "30d" | "90d" | "all";
-
-function getConversionVariant(rate: number): "success" | "primary" | "muted" {
-  if (rate > 20) {
-    return "success";
-  }
-  if (rate > 0) {
-    return "primary";
-  }
-  return "muted";
-}
+  FunnelRow,
+  MetricRow,
+  ReportingCard,
+  ReportingEmpty,
+  StatCard,
+} from "./_components/reporting-primitives";
+import { ActivityLog } from "./_sections/activity-log";
 
 function convBarColor(rate: number): string {
   if (rate > 20) {
@@ -42,85 +30,19 @@ function convBarColor(rate: number): string {
   return "bg-muted";
 }
 
-function StatCard({
-  label,
-  value,
-  sub,
-  accent,
-}: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  accent?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1 rounded-lg border p-4">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className={`font-mono font-semibold text-xl ${accent ?? ""}`}>
-        {value}
-      </span>
-      {sub && (
-        <span className="text-[10px] text-muted-foreground/60">{sub}</span>
-      )}
-    </div>
-  );
-}
-
-function BarRow({
-  label,
-  value,
-  max,
-  barClass,
-  suffix,
-}: {
-  label: string;
-  value: number;
-  max: number;
-  barClass?: string;
-  suffix?: React.ReactNode;
-}) {
-  const pct = max > 0 ? (value / max) * 100 : 0;
-  return (
-    <div className="group flex items-center gap-3 rounded-sm px-1 py-1 transition-colors hover:bg-muted/30">
-      <span className="w-20 shrink-0 text-muted-foreground text-xs">
-        {label}
-      </span>
-      <div className="flex-1 rounded-full bg-muted/40">
-        <div
-          className={`h-1.5 rounded-full transition-all duration-500 ${barClass ?? "bg-primary/50"}`}
-          style={{
-            width: `${Math.max(pct, 3)}%`,
-            minWidth: value > 0 ? "8px" : undefined,
-          }}
-        />
-      </div>
-      <span className="w-8 text-right font-mono text-muted-foreground text-xs">
-        {value}
-      </span>
-      {suffix}
-    </div>
-  );
+function convVariant(rate: number): "success" | "primary" | "muted" {
+  if (rate > 20) {
+    return "success";
+  }
+  if (rate > 0) {
+    return "primary";
+  }
+  return "muted";
 }
 
 export function ReportingClient() {
-  const [auditRange, setAuditRange] = useState<AuditRange>("30d");
   const { data, isLoading } = useReportingData();
   const { data: velocity } = usePipelineVelocity();
-
-  const auditOpts = useMemo(() => {
-    if (auditRange === "all") {
-      return undefined;
-    }
-    const now = dayjs();
-    const daysMap = { "7d": 7, "30d": 30, "90d": 90 } as const;
-    const from = now.subtract(
-      daysMap[auditRange as keyof typeof daysMap],
-      "day"
-    );
-    return { from: from.toISOString(), to: now.toISOString() };
-  }, [auditRange]);
-
-  const { data: auditData } = useStatusChangeHistory(auditOpts);
 
   if (isLoading || !data) {
     return <PageSkeleton header="Reporting" />;
@@ -180,107 +102,76 @@ export function ReportingClient() {
         </div>
       </PageHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-5xl space-y-0">
-          {/* Top stat cards */}
-          <div className="grid grid-cols-2 gap-px border-b bg-border sm:grid-cols-4">
-            <div className="bg-background p-5">
-              <StatCard
-                accent="text-blue-600"
-                label="Total Leads"
-                value={totalLeads}
-              />
-            </div>
-            <div className="bg-background p-5">
-              <StatCard
-                accent="text-emerald-600"
-                label="Converted"
-                sub={`${convRate}% conversion rate`}
-                value={convertedCount}
-              />
-            </div>
-            <div className="bg-background p-5">
-              <StatCard
-                accent="text-amber-600"
-                label="In Pipeline"
-                sub="active stages"
-                value={
-                  ACTIVE_LEAD_STATUSES.filter(
-                    (s) =>
-                      !["converted", "lost"].includes(s) &&
-                      (funnelMap[s] ?? 0) > 0
-                  ).length
-                }
-              />
-            </div>
-            <div className="bg-background p-5">
-              <StatCard
-                accent="text-red-600"
-                label="Lost"
-                sub={
-                  totalLeads > 0
-                    ? `${(((funnelMap.lost ?? 0) / totalLeads) * 100).toFixed(0)}% loss rate`
-                    : undefined
-                }
-                value={funnelMap.lost ?? 0}
-              />
-            </div>
+      <div className="min-h-0 flex-1 overflow-y-auto bg-muted/20">
+        <div className="mx-auto max-w-6xl space-y-5 p-5">
+          {/* ── Stat cards ── */}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard
+              accent="text-blue-600"
+              label="Total Leads"
+              value={totalLeads}
+            />
+            <StatCard
+              accent="text-emerald-600"
+              label="Converted"
+              sub={`${convRate}% conversion rate`}
+              value={convertedCount}
+            />
+            <StatCard
+              accent="text-amber-600"
+              label="In Pipeline"
+              sub="active stages"
+              value={
+                ACTIVE_LEAD_STATUSES.filter(
+                  (s) =>
+                    !["converted", "lost"].includes(s) &&
+                    (funnelMap[s] ?? 0) > 0
+                ).length
+              }
+            />
+            <StatCard
+              accent="text-red-600"
+              label="Lost"
+              sub={
+                totalLeads > 0
+                  ? `${(((funnelMap.lost ?? 0) / totalLeads) * 100).toFixed(0)}% loss rate`
+                  : undefined
+              }
+              value={funnelMap.lost ?? 0}
+            />
           </div>
 
-          <div className="grid lg:grid-cols-5">
-            {/* Left column — main charts */}
-            <div className="space-y-0 border-b lg:col-span-3 lg:border-r lg:border-b-0">
-              {/* Funnel */}
-              <div className="border-b p-5">
-                <h2 className="font-medium text-sm">Pipeline Funnel</h2>
-                <div className="mt-4 space-y-1">
-                  {ACTIVE_LEAD_STATUSES.map((s) => {
-                    const c = funnelMap[s] ?? 0;
-                    const pct = (c / maxFunnel) * 100;
-                    return (
-                      <div
-                        className="group flex items-center gap-3 rounded-sm px-1 py-1 transition-colors hover:bg-muted/30"
-                        key={s}
-                      >
-                        <span className="w-24 text-muted-foreground text-xs">
-                          {STATUS_LABELS[s]}
-                        </span>
-                        <div className="flex-1 rounded-full bg-muted/40">
-                          <div
-                            className={`h-4 rounded-full ${STATUS_DOT_COLORS[s]} flex items-center justify-end pr-2 transition-all duration-500`}
-                            style={{
-                              width: `${Math.max(pct, 3)}%`,
-                              minWidth: c > 0 ? "28px" : undefined,
-                            }}
-                          >
-                            {c > 0 && (
-                              <span className="font-mono text-[9px] text-white mix-blend-difference">
-                                {c}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+          {/* ── Main grid ── */}
+          <div className="grid gap-5 lg:grid-cols-5">
+            {/* Left: funnel + timeline */}
+            <div className="space-y-5 lg:col-span-3">
+              <ReportingCard title="Pipeline Funnel">
+                <div className="space-y-0.5">
+                  {ACTIVE_LEAD_STATUSES.map((s) => (
+                    <FunnelRow
+                      barColor={STATUS_DOT_COLORS[s]}
+                      key={s}
+                      label={STATUS_LABELS[s]}
+                      max={maxFunnel}
+                      value={funnelMap[s] ?? 0}
+                    />
+                  ))}
                 </div>
-              </div>
+              </ReportingCard>
 
-              {/* Leads Over Time */}
-              <div className="border-b p-5">
-                <h2 className="font-medium text-sm">Leads Over Time</h2>
+              <ReportingCard
+                description="Last 6 months"
+                title="Leads Over Time"
+              >
                 {data.monthlyLeads.length === 0 ? (
-                  <EmptyState className="py-6" message="No data yet" />
+                  <ReportingEmpty message="No data yet" />
                 ) : (
-                  <div
-                    className="mt-4 flex items-end gap-1.5 sm:gap-3"
-                    style={{ height: "140px" }}
-                  >
+                  <div className="flex items-end gap-2" style={{ height: 160 }}>
                     {data.monthlyLeads.map((m) => {
                       const barH = (m.count / maxMonthly) * 100;
                       return (
                         <div
-                          className="group flex flex-1 flex-col items-center justify-end gap-1"
+                          className="group flex flex-1 flex-col items-center justify-end gap-1.5"
                           key={m.month}
                           style={{ height: "100%" }}
                         >
@@ -288,12 +179,10 @@ export function ReportingClient() {
                             {m.count}
                           </span>
                           <div
-                            className="w-full rounded-t-sm bg-primary/20 transition-all duration-500 group-hover:bg-primary/40"
-                            style={{
-                              height: `${Math.max(barH, 2)}%`,
-                            }}
+                            className="w-full rounded-md bg-primary/15 transition-all duration-500 group-hover:bg-primary/30"
+                            style={{ height: `${Math.max(barH, 3)}%` }}
                           />
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="text-[11px] text-muted-foreground tabular-nums">
                             {m.month.slice(5)}
                           </span>
                         </div>
@@ -301,136 +190,64 @@ export function ReportingClient() {
                     })}
                   </div>
                 )}
-              </div>
-
-              {/* Activity Log */}
-              <div className="p-5">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-medium text-sm">Activity Log</h2>
-                  <SegmentedControl
-                    onChange={setAuditRange}
-                    segments={[
-                      { value: "7d" as const, label: "7d" },
-                      { value: "30d" as const, label: "30d" },
-                      { value: "90d" as const, label: "90d" },
-                      { value: "all" as const, label: "All" },
-                    ]}
-                    value={auditRange}
-                  />
-                </div>
-                <div className="mt-3 max-h-72 space-y-0.5 overflow-y-auto">
-                  {auditData && auditData.length === 0 && (
-                    <EmptyState
-                      className="py-6"
-                      message="No status changes in this period"
-                    />
-                  )}
-                  {auditData?.map((entry) => {
-                    const meta = entry.metadata as {
-                      oldStatus?: string;
-                      newStatus?: string;
-                    } | null;
-                    return (
-                      <div
-                        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-muted/30"
-                        key={entry.id}
-                      >
-                        <span className="w-16 shrink-0 font-mono text-[10px] text-muted-foreground">
-                          {dayjs(entry.createdAt).format("MMM D")}
-                        </span>
-                        {entry.lead && (
-                          <span className="min-w-0 flex-1 truncate font-medium">
-                            {entry.lead.name}
-                          </span>
-                        )}
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          {meta?.oldStatus && (
-                            <StatusBadge status={meta.oldStatus} />
-                          )}
-                          {meta?.oldStatus && meta?.newStatus && (
-                            <span className="text-muted-foreground/50">→</span>
-                          )}
-                          {meta?.newStatus && (
-                            <StatusBadge status={meta.newStatus} />
-                          )}
-                        </div>
-                        {entry.user && (
-                          <UserAvatar
-                            className="ml-1 shrink-0"
-                            name={(entry.user as { name: string }).name}
-                            size="xs"
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              </ReportingCard>
             </div>
 
-            {/* Right column — sidebar metrics */}
-            <div className="flex flex-col lg:col-span-2">
-              {/* By Source */}
-              <div className="border-b p-5">
-                <h2 className="font-medium text-sm">By Source</h2>
-                <div className="mt-3 space-y-1">
-                  {data.bySource.map((s) => (
-                    <BarRow
-                      barClass="bg-primary/40"
-                      key={s.source}
-                      label={SOURCE_LABELS[s.source] ?? s.source}
-                      max={maxSource}
-                      value={s.count}
-                    />
-                  ))}
-                  {data.bySource.length === 0 && (
-                    <EmptyState className="py-4" message="No data" />
-                  )}
-                </div>
-              </div>
+            {/* Right: sources + velocity */}
+            <div className="space-y-5 lg:col-span-2">
+              <ReportingCard title="By Source">
+                {data.bySource.length === 0 ? (
+                  <ReportingEmpty message="No data" />
+                ) : (
+                  <div className="space-y-0.5">
+                    {data.bySource.map((s) => (
+                      <MetricRow
+                        barClass="bg-primary/40"
+                        key={s.source}
+                        label={SOURCE_LABELS[s.source] ?? s.source}
+                        max={maxSource}
+                        value={s.count}
+                      />
+                    ))}
+                  </div>
+                )}
+              </ReportingCard>
 
-              {/* Conversion by Source */}
-              <div className="border-b p-5">
-                <h2 className="font-medium text-sm">Conversion Rate</h2>
-                <div className="mt-3 space-y-2">
-                  {data.convBySource.map((s) => (
-                    <div
-                      className="flex items-center gap-3 rounded-sm px-1 py-1"
-                      key={s.source}
-                    >
-                      <span className="w-20 shrink-0 text-muted-foreground text-xs">
-                        {SOURCE_LABELS[s.source] ?? s.source}
-                      </span>
-                      <div className="flex flex-1 items-center gap-2">
-                        <div className="flex-1 rounded-full bg-muted/40">
+              <ReportingCard description="By source" title="Conversion Rate">
+                {data.convBySource.length === 0 ? (
+                  <ReportingEmpty message="No data" />
+                ) : (
+                  <div className="space-y-1.5">
+                    {data.convBySource.map((s) => (
+                      <div
+                        className="flex items-center gap-3 py-1"
+                        key={s.source}
+                      >
+                        <span className="w-20 shrink-0 text-[13px] text-muted-foreground">
+                          {SOURCE_LABELS[s.source] ?? s.source}
+                        </span>
+                        <div className="h-1.5 flex-1 rounded-full bg-muted/50">
                           <div
-                            className={`h-1.5 rounded-full transition-all duration-500 ${convBarColor(s.rate)}`}
+                            className={`h-full rounded-full transition-all duration-500 ${convBarColor(s.rate)}`}
                             style={{
-                              width: `${Math.max(s.rate, 3)}%`,
+                              width: `${Math.max(s.rate, 2)}%`,
                               minWidth: s.rate > 0 ? "6px" : undefined,
                             }}
                           />
                         </div>
-                        <Pill variant={getConversionVariant(s.rate)}>
-                          {s.rate}%
-                        </Pill>
+                        <Pill variant={convVariant(s.rate)}>{s.rate}%</Pill>
                       </div>
-                    </div>
-                  ))}
-                  {data.convBySource.length === 0 && (
-                    <EmptyState className="py-4" message="No data" />
-                  )}
-                </div>
-              </div>
+                    ))}
+                  </div>
+                )}
+              </ReportingCard>
 
-              {/* Velocity */}
-              <div className="flex-1 p-5">
-                <h2 className="font-medium text-sm">Stage Duration</h2>
-                <p className="mt-0.5 text-[10px] text-muted-foreground/60">
-                  Avg days per stage
-                </p>
+              <ReportingCard
+                description="Avg days per stage"
+                title="Stage Duration"
+              >
                 {velocity && velocityEntries.length > 0 ? (
-                  <div className="mt-3 space-y-2">
+                  <div className="space-y-1">
                     {velocityEntries.map((s) => {
                       const v = velocity[s];
                       if (!v) {
@@ -438,19 +255,19 @@ export function ReportingClient() {
                       }
                       return (
                         <div
-                          className="flex items-center justify-between rounded-sm px-1 py-1"
+                          className="flex items-center justify-between py-1.5"
                           key={s}
                         >
-                          <span className="text-muted-foreground text-xs">
+                          <span className="text-[13px] text-muted-foreground">
                             {STATUS_LABELS[s]}
                           </span>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-baseline gap-2">
                             <span
-                              className={`font-medium font-mono text-sm ${STATUS_TEXT_COLORS[s] ?? ""}`}
+                              className={`font-mono font-semibold text-sm ${STATUS_TEXT_COLORS[s] ?? ""}`}
                             >
                               {v.avg}d
                             </span>
-                            <span className="text-[10px] text-muted-foreground/50">
+                            <span className="text-[11px] text-muted-foreground/50 tabular-nums">
                               {v.count} leads
                             </span>
                           </div>
@@ -459,11 +276,14 @@ export function ReportingClient() {
                     })}
                   </div>
                 ) : (
-                  <EmptyState className="py-6" message="Not enough data" />
+                  <ReportingEmpty message="Not enough data" />
                 )}
-              </div>
+              </ReportingCard>
             </div>
           </div>
+
+          {/* ── Activity log ── */}
+          <ActivityLog />
         </div>
       </div>
     </div>

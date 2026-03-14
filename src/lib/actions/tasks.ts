@@ -4,7 +4,7 @@ import { and, asc, eq, isNull, lte, type SQL } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { db } from "@/db";
-import { lead, task } from "@/db/schema";
+import { activity, lead, task } from "@/db/schema";
 import {
   addCalendarAttendees,
   createCalendarEvent,
@@ -221,6 +221,18 @@ export async function createTask(data: {
     })
     .returning();
 
+  await db.insert(activity).values({
+    leadId: data.leadId,
+    userId: currentUser.id,
+    type: "task_created",
+    content: data.title,
+    metadata: {
+      taskId: row.id,
+      taskType: data.type ?? "follow_up",
+      dueAt: data.dueAt.toISOString(),
+    },
+  });
+
   revalidateAll(data.leadId);
   return row;
 }
@@ -260,19 +272,26 @@ export async function updateTask(id: string, data: TaskUpdateFields) {
 }
 
 export async function completeTask(id: string) {
-  await getUser();
+  const user = await getUser();
   const existing = await db.query.task.findFirst({
     where: eq(task.id, id),
   });
   if (!existing) {
     throw new Error("Task not found");
   }
-
   const [row] = await db
     .update(task)
     .set({ completedAt: dayjs().toDate() })
     .where(eq(task.id, id))
     .returning();
+
+  await db.insert(activity).values({
+    leadId: existing.leadId,
+    userId: user.id,
+    type: "task_completed",
+    content: existing.title,
+    metadata: { taskId: id, taskType: existing.type },
+  });
 
   if (isMeetingType(existing.type) && existing.calendarEventId) {
     try {
@@ -422,12 +441,22 @@ export async function addTaskAttendees(id: string, emails: string[]) {
 }
 
 export async function deleteTask(id: string) {
-  await getUser();
+  const user = await getUser();
   const existing = await db.query.task.findFirst({
     where: eq(task.id, id),
   });
 
   const [row] = await db.delete(task).where(eq(task.id, id)).returning();
+
+  if (existing) {
+    await db.insert(activity).values({
+      leadId: existing.leadId,
+      userId: user.id,
+      type: "task_deleted",
+      content: existing.title,
+      metadata: { taskType: existing.type },
+    });
+  }
 
   if (existing?.calendarEventId) {
     try {

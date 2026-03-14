@@ -247,7 +247,7 @@ function LeadPreviewPanel({
         className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]"
         onClick={onClose}
       />
-      <div className="fixed top-0 right-0 z-50 flex h-full w-[420px] flex-col border-l bg-background shadow-2xl">
+      <div className="fixed top-0 right-0 z-50 flex h-full w-[420px] flex-col border-l bg-background">
         <div className="flex items-center justify-between border-b px-5 py-3.5">
           <h2 className="font-semibold text-sm">Lead Preview</h2>
           <Button onClick={onClose} size="icon-sm" variant="ghost">
@@ -636,7 +636,7 @@ export function LeadsPageClient() {
             <button
               className={`rounded-md px-2.5 py-1 font-medium text-xs transition-all ${
                 statusFilter === "all"
-                  ? "bg-background text-foreground shadow-sm"
+                  ? "bg-background text-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
               onClick={() => setStatusFilter("all")}
@@ -651,7 +651,7 @@ export function LeadsPageClient() {
               <button
                 className={`rounded-md px-2.5 py-1 font-medium text-xs transition-all ${
                   statusFilter === s
-                    ? "bg-background text-foreground shadow-sm"
+                    ? "bg-background text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
                 key={s}
@@ -869,7 +869,7 @@ export function LeadsPageClient() {
                               </span>
                             </TooltipTrigger>
                             <TooltipContent
-                              className="max-w-56 bg-card text-card-foreground shadow-lg ring-1 ring-border"
+                              className="max-w-56 bg-card text-card-foreground ring-1 ring-border"
                               side="left"
                             >
                               <div className="space-y-1 py-0.5">
@@ -969,7 +969,7 @@ export function LeadsPageClient() {
         )}
 
         {selected.size > 0 && (
-          <div className="absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-lg border bg-card px-4 py-2.5 shadow-xl">
+          <div className="absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-lg border bg-card px-4 py-2.5">
             <span className="font-medium text-sm">
               {selected.size} selected
             </span>

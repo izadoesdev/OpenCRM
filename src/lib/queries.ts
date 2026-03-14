@@ -231,11 +231,26 @@ export function useDeleteEmailTemplate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deleteEmailTemplate,
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: queryKeys.emailTemplates });
+      const prev = qc.getQueryData(queryKeys.emailTemplates);
+      qc.setQueryData(
+        queryKeys.emailTemplates,
+        (old: Array<{ id: string }> | undefined) =>
+          old?.filter((t) => t.id !== id)
+      );
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev) {
+        qc.setQueryData(queryKeys.emailTemplates, ctx.prev);
+      }
+      toast.error("Failed to delete template");
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.emailTemplates });
       toast.success("Template deleted");
     },
-    onError: () => toast.error("Failed to delete template"),
   });
 }
 
@@ -342,6 +357,7 @@ export function useImportLeads() {
 }
 
 export function useUpdateLead() {
+  const qc = useQueryClient();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: ({
@@ -351,13 +367,40 @@ export function useUpdateLead() {
       id: string;
       data: Parameters<typeof updateLead>[1];
     }) => updateLead(id, data),
+    onMutate: async ({ id, data }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.leads });
+      await qc.cancelQueries({ queryKey: queryKeys.lead(id) });
+
+      const prevLeads = qc.getQueryData(queryKeys.leads);
+      const prevLead = qc.getQueryData(queryKeys.lead(id));
+
+      qc.setQueryData(
+        queryKeys.leads,
+        (old: Array<{ id: string }> | undefined) =>
+          old?.map((l) => (l.id === id ? { ...l, ...data } : l))
+      );
+      qc.setQueryData(
+        queryKeys.lead(id),
+        (old: Record<string, unknown> | undefined) =>
+          old ? { ...old, ...data } : old
+      );
+      return { prevLeads, prevLead, id };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prevLeads) {
+        qc.setQueryData(queryKeys.leads, ctx.prevLeads);
+      }
+      if (ctx?.prevLead) {
+        qc.setQueryData(queryKeys.lead(ctx.id), ctx.prevLead);
+      }
+      toast.error("Failed to update lead");
+    },
     onSuccess: (row) => {
       if (row) {
         inv.lead(row.id);
       }
       toast.success("Lead updated");
     },
-    onError: () => toast.error("Failed to update lead"),
   });
 }
 
@@ -366,27 +409,59 @@ export function useDeleteLead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deleteLead,
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: queryKeys.leads });
+      const prev = qc.getQueryData(queryKeys.leads);
+      qc.setQueryData(
+        queryKeys.leads,
+        (old: Array<{ id: string }> | undefined) =>
+          old?.filter((l) => l.id !== id)
+      );
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev) {
+        qc.setQueryData(queryKeys.leads, ctx.prev);
+      }
+      toast.error("Failed to archive lead");
+    },
     onSuccess: () => {
       inv.leads();
       qc.invalidateQueries({ queryKey: queryKeys.archivedLeads });
       toast.success("Lead archived");
     },
-    onError: () => toast.error("Failed to archive lead"),
   });
 }
 
 export function useBulkUpdateStatus() {
+  const qc = useQueryClient();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: ({ ids, status }: { ids: string[]; status: string }) =>
       bulkUpdateStatus(ids, status),
+    onMutate: async ({ ids, status }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.leads });
+      const prev = qc.getQueryData(queryKeys.leads);
+      const idSet = new Set(ids);
+      qc.setQueryData(
+        queryKeys.leads,
+        (old: Array<{ id: string; status: string }> | undefined) =>
+          old?.map((l) => (idSet.has(l.id) ? { ...l, status } : l))
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) {
+        qc.setQueryData(queryKeys.leads, ctx.prev);
+      }
+      toast.error("Failed to update status");
+    },
     onSuccess: (_, { ids, status }) => {
       inv.leads();
       toast.success(
         `${ids.length} lead${ids.length > 1 ? "s" : ""} moved to ${STATUS_LABELS[status]}`
       );
     },
-    onError: () => toast.error("Failed to update status"),
   });
 }
 
@@ -395,12 +470,28 @@ export function useBulkDeleteLeads() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: bulkDeleteLeads,
+    onMutate: async (ids) => {
+      await qc.cancelQueries({ queryKey: queryKeys.leads });
+      const prev = qc.getQueryData(queryKeys.leads);
+      const idSet = new Set(ids);
+      qc.setQueryData(
+        queryKeys.leads,
+        (old: Array<{ id: string }> | undefined) =>
+          old?.filter((l) => !idSet.has(l.id))
+      );
+      return { prev };
+    },
+    onError: (_err, _ids, ctx) => {
+      if (ctx?.prev) {
+        qc.setQueryData(queryKeys.leads, ctx.prev);
+      }
+      toast.error("Failed to archive leads");
+    },
     onSuccess: (_, ids) => {
       inv.leads();
       qc.invalidateQueries({ queryKey: queryKeys.archivedLeads });
       toast.success(`${ids.length} lead${ids.length > 1 ? "s" : ""} archived`);
     },
-    onError: () => toast.error("Failed to archive leads"),
   });
 }
 
@@ -416,12 +507,27 @@ export function useRestoreLead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: restoreLead,
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: queryKeys.archivedLeads });
+      const prev = qc.getQueryData(queryKeys.archivedLeads);
+      qc.setQueryData(
+        queryKeys.archivedLeads,
+        (old: Array<{ id: string }> | undefined) =>
+          old?.filter((l) => l.id !== id)
+      );
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev) {
+        qc.setQueryData(queryKeys.archivedLeads, ctx.prev);
+      }
+      toast.error("Failed to restore lead");
+    },
     onSuccess: () => {
       inv.leads();
       qc.invalidateQueries({ queryKey: queryKeys.archivedLeads });
       toast.success("Lead restored");
     },
-    onError: () => toast.error("Failed to restore lead"),
   });
 }
 
@@ -429,15 +535,31 @@ export function usePermanentlyDeleteLead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: permanentlyDeleteLead,
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: queryKeys.archivedLeads });
+      const prev = qc.getQueryData(queryKeys.archivedLeads);
+      qc.setQueryData(
+        queryKeys.archivedLeads,
+        (old: Array<{ id: string }> | undefined) =>
+          old?.filter((l) => l.id !== id)
+      );
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev) {
+        qc.setQueryData(queryKeys.archivedLeads, ctx.prev);
+      }
+      toast.error("Failed to delete lead");
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.archivedLeads });
       toast.success("Lead permanently deleted");
     },
-    onError: () => toast.error("Failed to delete lead"),
   });
 }
 
 export function useAssignLead() {
+  const qc = useQueryClient();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: ({
@@ -447,15 +569,31 @@ export function useAssignLead() {
       leadId: string;
       assignedTo: string | null;
     }) => updateLead(leadId, { assignedTo }),
+    onMutate: async ({ leadId, assignedTo }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.lead(leadId) });
+      const prev = qc.getQueryData(queryKeys.lead(leadId));
+      qc.setQueryData(
+        queryKeys.lead(leadId),
+        (old: Record<string, unknown> | undefined) =>
+          old ? { ...old, assignedTo } : old
+      );
+      return { prev, leadId };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) {
+        qc.setQueryData(queryKeys.lead(ctx.leadId), ctx.prev);
+      }
+      toast.error("Failed to reassign lead");
+    },
     onSuccess: (_, { leadId }) => {
       inv.lead(leadId);
       toast.success("Lead reassigned");
     },
-    onError: () => toast.error("Failed to reassign lead"),
   });
 }
 
 export function useChangeLeadStatus() {
+  const qc = useQueryClient();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: ({
@@ -467,11 +605,38 @@ export function useChangeLeadStatus() {
       status: string;
       opts?: { plan?: string; note?: string };
     }) => changeLeadStatus(leadId, status, opts),
+    onMutate: async ({ leadId, status }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.leads });
+      await qc.cancelQueries({ queryKey: queryKeys.lead(leadId) });
+
+      const prevLeads = qc.getQueryData(queryKeys.leads);
+      const prevLead = qc.getQueryData(queryKeys.lead(leadId));
+
+      qc.setQueryData(
+        queryKeys.leads,
+        (old: Array<{ id: string; status: string }> | undefined) =>
+          old?.map((l) => (l.id === leadId ? { ...l, status } : l))
+      );
+      qc.setQueryData(
+        queryKeys.lead(leadId),
+        (old: { id: string; status: string } | undefined) =>
+          old ? { ...old, status } : old
+      );
+      return { prevLeads, prevLead, leadId };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prevLeads) {
+        qc.setQueryData(queryKeys.leads, ctx.prevLeads);
+      }
+      if (ctx?.prevLead) {
+        qc.setQueryData(queryKeys.lead(ctx.leadId), ctx.prevLead);
+      }
+      toast.error("Failed to change status");
+    },
     onSuccess: (_, { leadId, status }) => {
       inv.lead(leadId);
       toast.success(`Moved to ${STATUS_LABELS[status]}`);
     },
-    onError: () => toast.error("Failed to change status"),
   });
 }
 
@@ -685,12 +850,29 @@ export function useDeleteTask() {
   return useMutation({
     mutationFn: ({ id }: { id: string; leadId?: string | null }) =>
       deleteTask(id),
+    onMutate: async ({ id }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.tasks });
+      const prev = qc.getQueriesData({ queryKey: queryKeys.tasks });
+      qc.setQueriesData(
+        { queryKey: queryKeys.tasks },
+        (old: Array<{ id: string }> | undefined) =>
+          old?.filter((t) => t.id !== id)
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) {
+        for (const [key, data] of ctx.prev) {
+          qc.setQueryData(key, data);
+        }
+      }
+      toast.error("Failed to delete task");
+    },
     onSuccess: (_, { leadId }) => {
       inv.tasks(leadId);
       qc.invalidateQueries({ queryKey: queryKeys.calendarEvents });
       toast.success("Task deleted");
     },
-    onError: () => toast.error("Failed to delete task"),
   });
 }
 
@@ -748,11 +930,26 @@ export function useRevokeApiKey() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: revokeApiKey,
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: queryKeys.apiKeys });
+      const prev = qc.getQueryData(queryKeys.apiKeys);
+      qc.setQueryData(
+        queryKeys.apiKeys,
+        (old: Array<{ id: string }> | undefined) =>
+          old?.filter((k) => k.id !== id)
+      );
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev) {
+        qc.setQueryData(queryKeys.apiKeys, ctx.prev);
+      }
+      toast.error("Failed to revoke API key");
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.apiKeys });
       toast.success("API key revoked");
     },
-    onError: () => toast.error("Failed to revoke API key"),
   });
 }
 
@@ -760,10 +957,25 @@ export function useDeleteApiKey() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deleteApiKey,
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: queryKeys.apiKeys });
+      const prev = qc.getQueryData(queryKeys.apiKeys);
+      qc.setQueryData(
+        queryKeys.apiKeys,
+        (old: Array<{ id: string }> | undefined) =>
+          old?.filter((k) => k.id !== id)
+      );
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev) {
+        qc.setQueryData(queryKeys.apiKeys, ctx.prev);
+      }
+      toast.error("Failed to delete API key");
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.apiKeys });
       toast.success("API key deleted");
     },
-    onError: () => toast.error("Failed to delete API key"),
   });
 }

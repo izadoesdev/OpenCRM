@@ -106,7 +106,7 @@ export function SettingsSkeleton({ rows = 2 }: { rows?: number }) {
       {Array.from({ length: rows }).map((_, i) => (
         <div
           className="h-[60px] animate-pulse rounded-lg bg-muted/40"
-          key={`skeleton-${i}`}
+          key={`skeleton-${i.toString()}`}
         />
       ))}
     </div>
