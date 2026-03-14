@@ -14,74 +14,101 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { UserAvatar } from "@/components/micro";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { signOut, useSession } from "@/lib/auth-client";
-import { useGoogleConnection } from "@/lib/queries";
+import { useTasks } from "@/lib/queries";
 
-const navItems = [
+const MAIN_NAV = [
   { title: "Dashboard", href: "/", icon: DashboardBrowsingIcon },
   { title: "Leads", href: "/leads", icon: Contact01Icon },
   { title: "Pipeline", href: "/pipeline", icon: FilterIcon },
-  { title: "Tasks", href: "/tasks", icon: Task01Icon },
-  { title: "Reporting", href: "/reporting", icon: PresentationBarChart01Icon },
+  { title: "Tasks", href: "/tasks", icon: Task01Icon, badge: "tasks" as const },
+];
+
+const SECONDARY_NAV = [
+  {
+    title: "Reporting",
+    href: "/reporting",
+    icon: PresentationBarChart01Icon,
+  },
   { title: "Settings", href: "/settings", icon: Settings01Icon },
 ];
 
-function googleStatusColor(gConn: {
-  connected: boolean;
-  hasCalendar: boolean;
-  hasGmail: boolean;
-}) {
-  if (gConn.hasCalendar && gConn.hasGmail) {
-    return "bg-emerald-400";
-  }
-  if (gConn.connected) {
-    return "bg-amber-400";
-  }
-  return "bg-red-400";
-}
-
-function googleStatusLabel(gConn: {
-  connected: boolean;
-  hasCalendar: boolean;
-  hasGmail: boolean;
-}) {
-  if (gConn.hasCalendar && gConn.hasGmail) {
-    return "Google connected";
-  }
-  if (gConn.connected) {
-    return "Reconnect for Calendar + Gmail";
-  }
-  return "Google not connected";
+function isActive(pathname: string, href: string) {
+  return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
 
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
+  const { data: tasks } = useTasks();
 
   const user = session?.user;
-  const { data: gConn } = useGoogleConnection();
+  const openTaskCount = tasks?.filter((t) => !t.completedAt).length ?? 0;
 
   return (
-    <Sidebar collapsible="icon" variant="sidebar">
+    <Sidebar collapsible="icon" variant="inset">
       <SidebarContent>
         <SidebarGroup>
+          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
-                const active =
-                  item.href === "/"
-                    ? pathname === "/"
-                    : pathname.startsWith(item.href);
+              {MAIN_NAV.map((item) => {
+                const active = isActive(pathname, item.href);
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      isActive={active}
+                      render={<Link href={item.href} />}
+                      tooltip={item.title}
+                    >
+                      <HugeiconsIcon
+                        icon={item.icon}
+                        size={18}
+                        strokeWidth={active ? 2 : 1.5}
+                      />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                    {item.badge === "tasks" && openTaskCount > 0 && (
+                      <SidebarMenuBadge className="font-mono text-[10px] text-muted-foreground">
+                        {openTaskCount}
+                      </SidebarMenuBadge>
+                    )}
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator />
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {SECONDARY_NAV.map((item) => {
+                const active = isActive(pathname, item.href);
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
@@ -104,48 +131,60 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t px-3 py-2">
+      <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" tooltip={user?.name ?? "Account"}>
-              <UserAvatar name={user?.name} size="md" />
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate font-medium text-sm">
-                  {user?.name ?? "Loading..."}
-                </span>
-                <span className="truncate text-muted-foreground text-xs">
-                  {user?.email ?? ""}
-                </span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          {gConn && (
-            <SidebarMenuItem>
-              <div className="flex items-center gap-2 px-3 py-1.5 group-data-[collapsible=icon]:hidden">
-                <span
-                  className={`size-1.5 rounded-full ${googleStatusColor(gConn)}`}
-                />
-                <span className="text-[10px] text-muted-foreground">
-                  {googleStatusLabel(gConn)}
-                </span>
-              </div>
-            </SidebarMenuItem>
-          )}
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={async () => {
-                await signOut();
-                router.push("/sign-in");
-                router.refresh();
-              }}
-              tooltip="Sign out"
-            >
-              <HugeiconsIcon icon={Logout01Icon} size={18} strokeWidth={1.5} />
-              <span>Sign out</span>
-            </SidebarMenuButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <SidebarMenuButton
+                    size="lg"
+                    tooltip={user?.name ?? "Account"}
+                  />
+                }
+              >
+                <UserAvatar name={user?.name} size="md" />
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate font-medium text-sm">
+                    {user?.name ?? "Loading..."}
+                  </span>
+                  <span className="truncate text-[10px] text-muted-foreground">
+                    {user?.email ?? ""}
+                  </span>
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56" side="top">
+                <DropdownMenuItem onClick={() => router.push("/settings")}>
+                  <HugeiconsIcon
+                    icon={Settings01Icon}
+                    size={14}
+                    strokeWidth={1.5}
+                  />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={async () => {
+                    await signOut();
+                    router.push("/sign-in");
+                    router.refresh();
+                  }}
+                  variant="destructive"
+                >
+                  <HugeiconsIcon
+                    icon={Logout01Icon}
+                    size={14}
+                    strokeWidth={1.5}
+                  />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+
+      <SidebarRail />
     </Sidebar>
   );
 }
