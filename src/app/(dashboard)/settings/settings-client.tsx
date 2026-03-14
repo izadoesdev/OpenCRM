@@ -1,304 +1,102 @@
 "use client";
 
-import {
-  Add01Icon,
-  ArrowLeft01Icon,
-  Delete02Icon,
-  Edit02Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useState } from "react";
-import { UserAvatar } from "@/components/micro";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/page-header";
-import { EmptyState, PageSkeleton } from "@/components/page-skeleton";
-import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import dayjs from "@/lib/dayjs";
-import {
-  useArchivedLeads,
-  useCreateEmailTemplate,
-  useDeleteEmailTemplate,
-  useEmailTemplates,
-  usePermanentlyDeleteLead,
-  useRestoreLead,
-  useUpdateEmailTemplate,
-} from "@/lib/queries";
+  SettingsDivider,
+  SettingsNavItem,
+} from "./_components/settings-layout";
+import { ApiKeysSection } from "./_sections/api-keys-section";
+import { ArchivedLeadsSection } from "./_sections/archived-leads-section";
+import { EmailTemplatesSection } from "./_sections/email-templates-section";
 
-interface EditingTemplate {
-  body: string;
-  id?: string;
-  name: string;
-  subject: string;
-}
+const SECTIONS = [
+  { id: "email-templates", label: "Email Templates" },
+  { id: "api-keys", label: "API Keys" },
+  { id: "archived-leads", label: "Archived Leads" },
+] as const;
 
 export function SettingsClient() {
-  const { data: templates = [], isLoading } = useEmailTemplates();
-  const { data: archivedLeads = [], isLoading: archivedLoading } =
-    useArchivedLeads();
-  const createMut = useCreateEmailTemplate();
-  const updateMut = useUpdateEmailTemplate();
-  const deleteMut = useDeleteEmailTemplate();
-  const restoreLead = useRestoreLead();
-  const permanentlyDelete = usePermanentlyDeleteLead();
-  const [editing, setEditing] = useState<EditingTemplate | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeSection, setActiveSection] = useState(SECTIONS[0].id);
 
-  if (isLoading) {
-    return <PageSkeleton header="Settings" />;
-  }
-
-  function handleSave() {
-    if (!(editing?.name?.trim() && editing?.subject?.trim())) {
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) {
       return;
     }
-    if (editing.id) {
-      updateMut.mutate(
-        {
-          id: editing.id,
-          data: {
-            name: editing.name,
-            subject: editing.subject,
-            body: editing.body,
-          },
-        },
-        { onSuccess: () => setEditing(null) }
-      );
-    } else {
-      createMut.mutate(
-        { name: editing.name, subject: editing.subject, body: editing.body },
-        { onSuccess: () => setEditing(null) }
-      );
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+          }
+        }
+      },
+      {
+        root: container,
+        rootMargin: "-10% 0px -80% 0px",
+        threshold: 0,
+      }
+    );
+
+    for (const { id } of SECTIONS) {
+      const el = document.getElementById(id);
+      if (el) {
+        observer.observe(el);
+      }
     }
-  }
+
+    return () => observer.disconnect();
+  }, []);
+
+  const scrollTo = useCallback((id: string) => {
+    const el = document.getElementById(id);
+    if (!el) {
+      return;
+    }
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   return (
     <div className="flex h-full flex-col">
       <PageHeader>
-        <div className="flex flex-1 items-center justify-between">
-          <h1 className="font-semibold text-lg tracking-tight">Settings</h1>
-        </div>
+        <h1 className="font-semibold text-lg tracking-tight">Settings</h1>
       </PageHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">
-        <div className="mx-auto max-w-2xl">
-          <div className="flex items-center justify-between">
-            <h2 className="font-medium text-sm">Email Templates</h2>
-            <Button
-              onClick={() => setEditing({ name: "", subject: "", body: "" })}
-              size="sm"
-            >
-              <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-              New Template
-            </Button>
-          </div>
-          <p className="mt-1 text-muted-foreground text-xs">
-            Templates can use merge tags: {"{{name}}"}, {"{{company}}"},{" "}
-            {"{{title}}"}
-          </p>
-
-          {templates.length === 0 && (
-            <EmptyState className="mt-8" message="No email templates yet" />
-          )}
-
-          <div className="mt-4 space-y-2">
-            {(
-              templates as Array<{
-                id: string;
-                name: string;
-                subject: string;
-                body: string;
-                createdAt: Date;
-              }>
-            ).map((t) => (
-              <div
-                className="flex items-start gap-3 rounded-lg border p-4 transition-colors hover:bg-muted/30"
-                key={t.id}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sm">{t.name}</p>
-                  <p className="mt-0.5 truncate text-muted-foreground text-xs">
-                    Subject: {t.subject}
-                  </p>
-                  <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">
-                    {t.body}
-                  </p>
-                  <p className="mt-1 text-[10px] text-muted-foreground/60">
-                    Created {dayjs(t.createdAt).fromNow()}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    onClick={() =>
-                      setEditing({
-                        id: t.id,
-                        name: t.name,
-                        subject: t.subject,
-                        body: t.body,
-                      })
-                    }
-                    size="icon-sm"
-                    variant="ghost"
-                  >
-                    <HugeiconsIcon
-                      icon={Edit02Icon}
-                      size={14}
-                      strokeWidth={1.5}
-                    />
-                  </Button>
-                  <Button
-                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => deleteMut.mutate(t.id)}
-                    size="icon-sm"
-                    variant="ghost"
-                  >
-                    <HugeiconsIcon
-                      icon={Delete02Icon}
-                      size={14}
-                      strokeWidth={1.5}
-                    />
-                  </Button>
-                </div>
-              </div>
+      <div className="flex min-h-0 flex-1">
+        <nav className="hidden w-52 shrink-0 border-r md:block">
+          <div className="sticky top-0 space-y-0.5 p-3">
+            <p className="mb-2 px-2.5 font-medium text-[11px] text-muted-foreground/70 uppercase tracking-widest">
+              Settings
+            </p>
+            {SECTIONS.map((s) => (
+              <SettingsNavItem
+                active={activeSection === s.id}
+                key={s.id}
+                label={s.label}
+                onClick={scrollTo}
+                sectionId={s.id}
+              />
             ))}
           </div>
+        </nav>
 
-          <div className="mt-12">
-            <h2 className="font-medium text-sm">Archived Leads</h2>
-            <p className="mt-1 text-muted-foreground text-xs">
-              Restore or permanently delete archived leads
-            </p>
-            {archivedLoading && (
-              <div className="mt-4 h-20 animate-pulse rounded-lg bg-muted/40" />
-            )}
-            {!archivedLoading && archivedLeads.length === 0 && (
-              <EmptyState className="mt-8" message="No archived leads" />
-            )}
-            {!archivedLoading && archivedLeads.length > 0 && (
-              <div className="mt-4 space-y-2">
-                {archivedLeads.map((l) => (
-                  <div
-                    className="flex items-center justify-between gap-3 rounded-lg border p-4 transition-colors hover:bg-muted/30"
-                    key={l.id}
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <UserAvatar name={l.name} size="md" />
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-sm">{l.name}</p>
-                        <p className="truncate text-muted-foreground text-xs">
-                          {l.company ? `${l.company} · ${l.email}` : l.email}
-                        </p>
-                        <p className="mt-0.5 text-[10px] text-muted-foreground/60">
-                          Archived{" "}
-                          {l.archivedAt ? dayjs(l.archivedAt).fromNow() : ""}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        disabled={
-                          restoreLead.isPending || permanentlyDelete.isPending
-                        }
-                        onClick={() => restoreLead.mutate(l.id)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        <HugeiconsIcon
-                          icon={ArrowLeft01Icon}
-                          size={14}
-                          strokeWidth={1.5}
-                        />
-                        Restore
-                      </Button>
-                      <Button
-                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                        disabled={
-                          restoreLead.isPending || permanentlyDelete.isPending
-                        }
-                        onClick={() => permanentlyDelete.mutate(l.id)}
-                        size="sm"
-                        variant="ghost"
-                      >
-                        <HugeiconsIcon
-                          icon={Delete02Icon}
-                          size={14}
-                          strokeWidth={1.5}
-                        />
-                        Delete Forever
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        <div className="min-h-0 flex-1 overflow-y-auto" ref={scrollRef}>
+          <div className="mx-auto max-w-2xl px-6 py-8">
+            <EmailTemplatesSection />
+            <div className="my-10">
+              <SettingsDivider />
+            </div>
+            <ApiKeysSection />
+            <div className="my-10">
+              <SettingsDivider />
+            </div>
+            <ArchivedLeadsSection />
           </div>
         </div>
       </div>
-
-      <Dialog onOpenChange={(v) => !v && setEditing(null)} open={!!editing}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {editing?.id ? "Edit Template" : "New Template"}
-            </DialogTitle>
-            <DialogDescription>
-              Use {"{{name}}"}, {"{{company}}"}, {"{{title}}"} as merge tags
-            </DialogDescription>
-          </DialogHeader>
-          {editing && (
-            <div className="space-y-3">
-              <Input
-                onChange={(e) =>
-                  setEditing({ ...editing, name: e.target.value })
-                }
-                placeholder="Template name"
-                value={editing.name}
-              />
-              <Input
-                onChange={(e) =>
-                  setEditing({ ...editing, subject: e.target.value })
-                }
-                placeholder="Email subject"
-                value={editing.subject}
-              />
-              <Textarea
-                className="min-h-[120px]"
-                onChange={(e) =>
-                  setEditing({ ...editing, body: e.target.value })
-                }
-                placeholder="Email body..."
-                value={editing.body}
-              />
-              <div className="flex justify-end gap-2">
-                <Button
-                  onClick={() => setEditing(null)}
-                  size="sm"
-                  variant="ghost"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  disabled={
-                    !(editing.name.trim() && editing.subject.trim()) ||
-                    createMut.isPending ||
-                    updateMut.isPending
-                  }
-                  onClick={handleSave}
-                  size="sm"
-                >
-                  {editing.id ? "Save Changes" : "Create Template"}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -50,6 +50,12 @@ import { getTeamMembers } from "@/lib/actions/team";
 import { STATUS_LABELS } from "@/lib/constants";
 import dayjs from "@/lib/dayjs";
 import {
+  createApiKey,
+  deleteApiKey,
+  getApiKeys,
+  revokeApiKey,
+} from "./actions/api-keys";
+import {
   getCalendarEvent,
   getUpcomingCalendarEvents,
 } from "./actions/calendar";
@@ -68,6 +74,7 @@ export const queryKeys = {
   tasks: ["tasks"] as const,
   dashboard: ["dashboard"] as const,
   emailTemplates: ["email-templates"] as const,
+  apiKeys: ["api-keys"] as const,
   team: ["team"] as const,
   calendarEvents: ["calendar-events"] as const,
   calendarEvent: (id: string) => ["calendar-event", id] as const,
@@ -711,5 +718,52 @@ export function useAddTaskAttendees() {
       toast.success("Invite sent");
     },
     onError: () => toast.error("Failed to add attendees"),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// API key queries & mutations
+// ---------------------------------------------------------------------------
+
+export function useApiKeys() {
+  return useQuery({
+    queryKey: queryKeys.apiKeys,
+    queryFn: () => getApiKeys(),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useCreateApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => createApiKey(name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.apiKeys });
+    },
+    onError: () => toast.error("Failed to create API key"),
+  });
+}
+
+export function useRevokeApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: revokeApiKey,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.apiKeys });
+      toast.success("API key revoked");
+    },
+    onError: () => toast.error("Failed to revoke API key"),
+  });
+}
+
+export function useDeleteApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteApiKey,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.apiKeys });
+      toast.success("API key deleted");
+    },
+    onError: () => toast.error("Failed to delete API key"),
   });
 }

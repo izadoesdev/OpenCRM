@@ -21,6 +21,7 @@ export const LEAD_SOURCES = [
   "referral",
   "linkedin",
   "cold_email",
+  "api",
   "other",
 ] as const;
 
@@ -68,6 +69,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   referral: "Referral",
   linkedin: "LinkedIn",
   cold_email: "Cold Email",
+  api: "API",
   other: "Other",
 };
 

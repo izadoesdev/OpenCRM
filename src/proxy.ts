@@ -25,6 +25,6 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/api/auth/error",
-    "/((?!sign-in|auth/error|api/auth|_next/static|_next/image|favicon.ico).*)",
+    "/((?!sign-in|auth/error|api/auth|api/v1|_next/static|_next/image|favicon.ico).*)",
   ],
 };

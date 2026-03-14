@@ -81,6 +81,31 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)]
 );
 
+// ── API keys ──
+
+export const apiKey = pgTable(
+  "api_key",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull(),
+    keyHash: text("key_hash").notNull().unique(),
+    prefix: text("prefix").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    lastUsedAt: timestamp("last_used_at"),
+    expiresAt: timestamp("expires_at"),
+    revokedAt: timestamp("revoked_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("api_key_keyHash_idx").on(table.keyHash),
+    index("api_key_createdBy_idx").on(table.createdBy),
+  ]
+);
+
 // ── CRM tables ──
 
 export const lead = pgTable(
@@ -200,6 +225,7 @@ export const userRelations = relations(user, ({ many }) => ({
   leads: many(lead),
   activities: many(activity),
   tasks: many(task),
+  apiKeys: many(apiKey),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -250,6 +276,13 @@ export const taskRelations = relations(task, ({ one }) => ({
 export const emailTemplateRelations = relations(emailTemplate, ({ one }) => ({
   creator: one(user, {
     fields: [emailTemplate.createdBy],
+    references: [user.id],
+  }),
+}));
+
+export const apiKeyRelations = relations(apiKey, ({ one }) => ({
+  creator: one(user, {
+    fields: [apiKey.createdBy],
     references: [user.id],
   }),
 }));
