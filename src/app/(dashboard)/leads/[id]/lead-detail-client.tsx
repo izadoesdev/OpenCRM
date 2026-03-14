@@ -15,6 +15,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmailComposeDialog } from "@/components/email-compose-dialog";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
 import { LogActivityDialog } from "@/components/log-activity-dialog";
@@ -87,6 +88,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
   const [addingField, setAddingField] = useState(false);
   const [fieldKey, setFieldKey] = useState("");
   const [fieldValue, setFieldValue] = useState("");
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
   if (isLoading) {
     return <PageSkeleton />;
@@ -194,11 +196,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() =>
-                    deleteLeadMut.mutate(id, {
-                      onSuccess: () => router.push("/leads"),
-                    })
-                  }
+                  onClick={() => setShowArchiveConfirm(true)}
                   variant="destructive"
                 >
                   <HugeiconsIcon
@@ -310,6 +308,18 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
         onOpenChange={setShowEmail}
         open={showEmail}
         templates={templates}
+      />
+      <ConfirmDialog
+        confirmLabel="Archive"
+        description={`${lead.name} will be moved to the archive. You can restore them later from settings.`}
+        icon={Delete02Icon}
+        onConfirm={() =>
+          deleteLeadMut.mutate(id, { onSuccess: () => router.push("/leads") })
+        }
+        onOpenChange={setShowArchiveConfirm}
+        open={showArchiveConfirm}
+        title="Archive this lead?"
+        variant="danger"
       />
     </div>
   );

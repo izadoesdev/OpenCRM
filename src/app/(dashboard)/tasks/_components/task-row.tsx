@@ -12,6 +12,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { useState } from "react";
+import { useConfirmDialog } from "@/components/confirm-dialog";
 import {
   MeetingDetail,
   MeetingLinkBadge,
@@ -80,6 +81,14 @@ function TaskDetail({
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const deleteConfirm = useConfirmDialog({
+    title: "Delete this task?",
+    description: `"${t.title}" will be permanently deleted.`,
+    confirmLabel: "Delete",
+    variant: "danger",
+    icon: Delete02Icon,
+    onConfirm: onDelete,
+  });
 
   if (editing) {
     return (
@@ -192,7 +201,7 @@ function TaskDetail({
         </Button>
         <Button
           className="text-red-600 hover:bg-red-500/10 hover:text-red-600"
-          onClick={onDelete}
+          onClick={deleteConfirm.trigger}
           size="sm"
           variant="ghost"
         >
@@ -200,6 +209,7 @@ function TaskDetail({
           Delete
         </Button>
       </div>
+      {deleteConfirm.dialog}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
 } from "@/lib/actions/calendar";
 import { auth } from "@/lib/auth";
 import dayjs from "@/lib/dayjs";
+import type { SuggestedTask } from "./status";
 
 async function getUser() {
   const session = await auth.api.getSession({
@@ -301,56 +302,25 @@ export async function completeTask(id: string) {
     }
   }
 
+  let suggestedTask: SuggestedTask | null = null;
+
   if (existing.recurrence) {
     const now = dayjs().toDate();
     const base = existing.dueAt < now ? now : existing.dueAt;
     const nextDue = nextDueDate(base, existing.recurrence);
-    await createRecurringFollowUp(existing, nextDue);
+    suggestedTask = {
+      leadId: existing.leadId,
+      title: existing.title,
+      description: existing.description,
+      type: existing.type,
+      recurrence: existing.recurrence,
+      meetingLink: existing.meetingLink,
+      dueAt: nextDue,
+    };
   }
 
   revalidateAll(row?.leadId);
-  return row;
-}
-
-async function createRecurringFollowUp(
-  existing: typeof task.$inferSelect,
-  nextDue: Date
-) {
-  let newCalendarEventId: string | null = null;
-  let newMeetingLink = existing.meetingLink;
-
-  if (isMeetingType(existing.type)) {
-    try {
-      const leadRow = await db.query.lead.findFirst({
-        where: eq(lead.id, existing.leadId),
-      });
-      const calResult = await createCalendarEvent({
-        summary: existing.title,
-        description: existing.description ?? undefined,
-        startTime: nextDue,
-        attendeeEmails: leadRow?.email ? [leadRow.email] : undefined,
-        addMeetLink: true,
-      });
-      newCalendarEventId = calResult.eventId;
-      if (calResult.meetLink) {
-        newMeetingLink = calResult.meetLink;
-      }
-    } catch {
-      /* recurring task still created without calendar */
-    }
-  }
-
-  await db.insert(task).values({
-    leadId: existing.leadId,
-    userId: existing.userId,
-    title: existing.title,
-    description: existing.description,
-    type: existing.type,
-    recurrence: existing.recurrence,
-    meetingLink: newMeetingLink,
-    calendarEventId: newCalendarEventId,
-    dueAt: nextDue,
-  });
+  return { ...row, suggestedTask };
 }
 
 export async function uncompleteTask(id: string) {

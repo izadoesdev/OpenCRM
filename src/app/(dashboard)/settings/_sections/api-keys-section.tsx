@@ -9,6 +9,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useState } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -46,6 +47,7 @@ export function ApiKeysSection() {
   const [showNewKeyDialog, setShowNewKeyDialog] = useState(false);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [revokeKeyId, setRevokeKeyId] = useState<string | null>(null);
 
   const handleCreateKey = useCallback(() => {
     if (!newKeyName.trim()) {
@@ -155,7 +157,7 @@ export function ApiKeysSection() {
                 <Button
                   className="text-red-600 hover:bg-red-50 hover:text-red-700"
                   disabled={revokeKeyMut.isPending || deleteKeyMut.isPending}
-                  onClick={() => revokeKeyMut.mutate(k.id)}
+                  onClick={() => setRevokeKeyId(k.id)}
                   size="sm"
                   variant="ghost"
                 >
@@ -217,6 +219,20 @@ export function ApiKeysSection() {
           </div>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        confirmLabel="Revoke Key"
+        description="This API key will stop working immediately. Any integrations using it will break."
+        icon={Cancel01Icon}
+        onConfirm={() => {
+          if (revokeKeyId) {
+            revokeKeyMut.mutate(revokeKeyId);
+          }
+        }}
+        onOpenChange={(v) => !v && setRevokeKeyId(null)}
+        open={!!revokeKeyId}
+        title="Revoke this API key?"
+        variant="danger"
+      />
     </SettingsSection>
   );
 }

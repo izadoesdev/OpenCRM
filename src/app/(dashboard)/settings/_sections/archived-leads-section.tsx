@@ -2,6 +2,8 @@
 
 import { ArrowLeft01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useState } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { UserAvatar } from "@/components/micro";
 import { Button } from "@/components/ui/button";
 import dayjs from "@/lib/dayjs";
@@ -25,6 +27,8 @@ export function ArchivedLeadsSection() {
   const { data: archivedLeads = [], isLoading } = useArchivedLeads();
   const restoreLead = useRestoreLead();
   const permanentlyDelete = usePermanentlyDeleteLead();
+  const [deleteLeadId, setDeleteLeadId] = useState<string | null>(null);
+  const deletingLead = archivedLeads.find((l) => l.id === deleteLeadId);
 
   return (
     <SettingsSection id="archived-leads">
@@ -82,7 +86,7 @@ export function ArchivedLeadsSection() {
                   disabled={
                     restoreLead.isPending || permanentlyDelete.isPending
                   }
-                  onClick={() => permanentlyDelete.mutate(l.id)}
+                  onClick={() => setDeleteLeadId(l.id)}
                   size="sm"
                   variant="ghost"
                 >
@@ -97,6 +101,20 @@ export function ArchivedLeadsSection() {
           ))}
         </SettingsList>
       )}
+      <ConfirmDialog
+        confirmLabel="Delete Forever"
+        description={`${deletingLead?.name ?? "This lead"} and all their data will be permanently deleted. This cannot be undone.`}
+        icon={Delete02Icon}
+        onConfirm={() => {
+          if (deleteLeadId) {
+            permanentlyDelete.mutate(deleteLeadId);
+          }
+        }}
+        onOpenChange={(v) => !v && setDeleteLeadId(null)}
+        open={!!deleteLeadId}
+        title="Permanently delete this lead?"
+        variant="danger"
+      />
     </SettingsSection>
   );
 }

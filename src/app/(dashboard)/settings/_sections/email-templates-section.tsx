@@ -7,6 +7,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,6 +49,7 @@ export function EmailTemplatesSection() {
   const updateMut = useUpdateEmailTemplate();
   const deleteMut = useDeleteEmailTemplate();
   const [editing, setEditing] = useState<EditingTemplate | null>(null);
+  const [deleteTemplateId, setDeleteTemplateId] = useState<string | null>(null);
 
   function handleSave() {
     if (!(editing?.name?.trim() && editing?.subject?.trim())) {
@@ -152,7 +154,7 @@ export function EmailTemplatesSection() {
                 </Button>
                 <Button
                   className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                  onClick={() => deleteMut.mutate(t.id)}
+                  onClick={() => setDeleteTemplateId(t.id)}
                   size="icon-sm"
                   variant="ghost"
                 >
@@ -226,6 +228,20 @@ export function EmailTemplatesSection() {
           )}
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        confirmLabel="Delete Template"
+        description="This email template will be permanently deleted."
+        icon={Delete02Icon}
+        onConfirm={() => {
+          if (deleteTemplateId) {
+            deleteMut.mutate(deleteTemplateId);
+          }
+        }}
+        onOpenChange={(v) => !v && setDeleteTemplateId(null)}
+        open={!!deleteTemplateId}
+        title="Delete this template?"
+        variant="danger"
+      />
     </SettingsSection>
   );
 }

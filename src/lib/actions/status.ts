@@ -4,9 +4,19 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { db } from "@/db";
-import { activity, lead, task } from "@/db/schema";
+import { activity, lead } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import dayjs from "@/lib/dayjs";
+
+export interface SuggestedTask {
+  description?: string | null;
+  dueAt: Date;
+  leadId: string;
+  meetingLink?: string | null;
+  recurrence?: string | null;
+  title: string;
+  type: string;
+}
 
 async function getUser() {
   const session = await auth.api.getSession({
@@ -62,34 +72,29 @@ export async function changeLeadStatus(
     metadata: { oldStatus: existing.status, newStatus },
   });
 
+  let suggestedTask: SuggestedTask | null = null;
+
   if (newStatus === "contacted") {
-    await db.insert(task).values({
+    suggestedTask = {
       leadId,
-      userId: user.id,
       title: `Follow up with ${existing.name}`,
       type: "follow_up",
       dueAt: dayjs().add(3, "day").toDate(),
-    });
-  }
-
-  if (newStatus === "demo") {
-    await db.insert(task).values({
+    };
+  } else if (newStatus === "demo") {
+    suggestedTask = {
       leadId,
-      userId: user.id,
       title: `Prepare demo for ${existing.name}`,
       type: "demo",
       dueAt: dayjs().add(1, "day").toDate(),
-    });
-  }
-
-  if (newStatus === "converted") {
-    await db.insert(task).values({
+    };
+  } else if (newStatus === "converted") {
+    suggestedTask = {
       leadId,
-      userId: user.id,
       title: `Onboarding check-in with ${existing.name}`,
       type: "follow_up",
       dueAt: dayjs().add(7, "day").toDate(),
-    });
+    };
   }
 
   revalidatePath("/leads");
@@ -97,6 +102,8 @@ export async function changeLeadStatus(
   revalidatePath("/pipeline");
   revalidatePath("/tasks");
   revalidatePath("/");
+
+  return { suggestedTask };
 }
 
 export async function addNote(leadId: string, content: string) {
@@ -129,9 +136,12 @@ export async function logOutreach(
   const existing = await db.query.lead.findFirst({
     where: eq(lead.id, leadId),
   });
+  let suggestedTask: SuggestedTask | null = null;
   if (existing?.status === "new") {
-    await changeLeadStatus(leadId, "contacted");
+    const result = await changeLeadStatus(leadId, "contacted");
+    suggestedTask = result?.suggestedTask ?? null;
   }
 
   revalidatePath(`/leads/${leadId}`);
+  return { suggestedTask };
 }

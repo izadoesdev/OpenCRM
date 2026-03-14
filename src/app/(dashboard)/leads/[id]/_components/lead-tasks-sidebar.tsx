@@ -11,6 +11,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useConfirmDialog } from "@/components/confirm-dialog";
 import { DateTimePicker } from "@/components/date-time-picker";
 import {
   MeetingDetail,
@@ -507,6 +508,14 @@ function LeadTaskDetail({
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const deleteConfirm = useConfirmDialog({
+    title: "Delete this task?",
+    description: `"${t.title}" will be permanently deleted.`,
+    confirmLabel: "Delete",
+    variant: "danger",
+    icon: Delete02Icon,
+    onConfirm: onDelete,
+  });
 
   if (editing) {
     return (
@@ -591,7 +600,7 @@ function LeadTaskDetail({
         </Button>
         <Button
           className="text-red-600 hover:bg-red-50 hover:text-red-700"
-          onClick={onDelete}
+          onClick={deleteConfirm.trigger}
           size="sm"
           variant="ghost"
         >
@@ -599,6 +608,7 @@ function LeadTaskDetail({
           Delete
         </Button>
       </div>
+      {deleteConfirm.dialog}
     </div>
   );
 }

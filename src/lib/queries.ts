@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTaskSuggestion } from "@/components/task-suggestion-provider";
 import {
   getDashboardStats,
   getPipelineCounts,
@@ -595,6 +596,7 @@ export function useAssignLead() {
 export function useChangeLeadStatus() {
   const qc = useQueryClient();
   const inv = useInvalidate();
+  const suggest = useTaskSuggestion();
   return useMutation({
     mutationFn: ({
       leadId,
@@ -633,9 +635,12 @@ export function useChangeLeadStatus() {
       }
       toast.error("Failed to change status");
     },
-    onSuccess: (_, { leadId, status }) => {
+    onSuccess: (result, { leadId, status }) => {
       inv.lead(leadId);
       toast.success(`Moved to ${STATUS_LABELS[status]}`);
+      if (result?.suggestedTask) {
+        suggest(result.suggestedTask);
+      }
     },
   });
 }
@@ -655,6 +660,7 @@ export function useAddNote() {
 
 export function useLogOutreach() {
   const inv = useInvalidate();
+  const suggest = useTaskSuggestion();
   return useMutation({
     mutationFn: ({
       leadId,
@@ -665,9 +671,12 @@ export function useLogOutreach() {
       type: "outreach_call" | "outreach_linkedin";
       content: string;
     }) => logOutreach(leadId, type, content),
-    onSuccess: (_, { leadId }) => {
+    onSuccess: (result, { leadId }) => {
       inv.lead(leadId);
       toast.success("Outreach logged");
+      if (result?.suggestedTask) {
+        suggest(result.suggestedTask);
+      }
     },
     onError: () => toast.error("Failed to log outreach"),
   });
@@ -676,6 +685,7 @@ export function useLogOutreach() {
 export function useSendEmail() {
   const qc = useQueryClient();
   const inv = useInvalidate();
+  const suggest = useTaskSuggestion();
   return useMutation({
     mutationFn: ({
       leadId,
@@ -693,10 +703,13 @@ export function useSendEmail() {
         replyToMessageId?: string;
       };
     }) => sendLeadEmail(leadId, data),
-    onSuccess: (_, { leadId, data }) => {
+    onSuccess: (result, { leadId, data }) => {
       inv.lead(leadId);
       qc.invalidateQueries({ queryKey: ["lead-emails"] });
       toast.success(data.sendVia === "gmail" ? "Sent via Gmail" : "Email sent");
+      if (result?.suggestedTask) {
+        suggest(result.suggestedTask);
+      }
     },
     onError: () => toast.error("Failed to send email"),
   });
@@ -721,6 +734,7 @@ export function useCreateTask() {
 export function useToggleTask() {
   const qc = useQueryClient();
   const inv = useInvalidate();
+  const suggest = useTaskSuggestion();
   return useMutation({
     mutationFn: ({
       id,
@@ -765,10 +779,23 @@ export function useToggleTask() {
       }
       toast.error("Failed to update task");
     },
-    onSuccess: (_, { isComplete, leadId }) => {
+    onSuccess: (result, { isComplete, leadId }) => {
       inv.tasks(leadId);
       qc.invalidateQueries({ queryKey: queryKeys.calendarEvents });
       toast.success(isComplete ? "Task reopened" : "Task completed");
+      const suggested =
+        result && "suggestedTask" in result
+          ? (
+              result as {
+                suggestedTask?:
+                  | import("@/lib/actions/status").SuggestedTask
+                  | null;
+              }
+            ).suggestedTask
+          : null;
+      if (suggested) {
+        suggest(suggested);
+      }
     },
   });
 }

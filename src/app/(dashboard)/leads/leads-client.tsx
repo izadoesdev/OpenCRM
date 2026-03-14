@@ -14,6 +14,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
 import { UserAvatar } from "@/components/micro";
 import { PageHeader } from "@/components/page-header";
@@ -425,6 +426,8 @@ export function LeadsPageClient() {
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [editLead, setEditLead] = useState<LeadRow | undefined>();
+  const [archiveLeadId, setArchiveLeadId] = useState<string | null>(null);
+  const [showBulkArchive, setShowBulkArchive] = useState(false);
   const [previewLeadId, setPreviewLeadId] = useState<string | null>(null);
 
   const deleteLead = useDeleteLead();
@@ -932,7 +935,7 @@ export function LeadsPageClient() {
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            onClick={() => deleteLead.mutate(lead.id)}
+                            onClick={() => setArchiveLeadId(lead.id)}
                             variant="destructive"
                           >
                             Archive
@@ -996,10 +999,7 @@ export function LeadsPageClient() {
               </DropdownMenuContent>
             </DropdownMenu>
             <Button
-              onClick={() => {
-                bulkDelete.mutate([...selected]);
-                setSelected(new Set());
-              }}
+              onClick={() => setShowBulkArchive(true)}
               size="sm"
               variant="outline"
             >
@@ -1029,6 +1029,33 @@ export function LeadsPageClient() {
           onClose={() => setPreviewLeadId(null)}
         />
       )}
+      <ConfirmDialog
+        confirmLabel="Archive"
+        description="This lead will be moved to the archive. You can restore them later from settings."
+        icon={Delete02Icon}
+        onConfirm={() => {
+          if (archiveLeadId) {
+            deleteLead.mutate(archiveLeadId);
+          }
+        }}
+        onOpenChange={(v) => !v && setArchiveLeadId(null)}
+        open={!!archiveLeadId}
+        title="Archive this lead?"
+        variant="danger"
+      />
+      <ConfirmDialog
+        confirmLabel={`Archive ${selected.size} lead${selected.size === 1 ? "" : "s"}`}
+        description={`${selected.size} lead${selected.size === 1 ? "" : "s"} will be moved to the archive.`}
+        icon={Delete02Icon}
+        onConfirm={() => {
+          bulkDelete.mutate([...selected]);
+          setSelected(new Set());
+        }}
+        onOpenChange={setShowBulkArchive}
+        open={showBulkArchive}
+        title="Archive selected leads?"
+        variant="danger"
+      />
     </div>
   );
 }

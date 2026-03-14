@@ -4,11 +4,12 @@ import { desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { db } from "@/db";
-import { activity, emailTemplate, lead, task } from "@/db/schema";
+import { activity, emailTemplate, lead } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import dayjs from "@/lib/dayjs";
 import { mergeTags, sendEmail } from "@/lib/email";
 import { sendGmailEmail } from "./gmail";
+import type { SuggestedTask } from "./status";
 
 async function getUser() {
   const session = await auth.api.getSession({
@@ -122,6 +123,8 @@ export async function sendLeadEmail(
     },
   });
 
+  let suggestedTask: SuggestedTask | null = null;
+
   if (row.status === "new") {
     await db
       .update(lead)
@@ -136,26 +139,12 @@ export async function sendLeadEmail(
       metadata: { oldStatus: "new", newStatus: "contacted" },
     });
 
-    await db.insert(task).values({
+    suggestedTask = {
       leadId,
-      userId: user.id,
       title: `Follow up with ${row.name}`,
       type: "follow_up",
       dueAt: dayjs().add(3, "day").toDate(),
-    });
-  } else if (row.status === "contacted") {
-    const existingTasks = await db.query.task.findMany({
-      where: eq(task.leadId, leadId),
-    });
-    const openFollowUp = existingTasks.find(
-      (t) => t.type === "follow_up" && !t.completedAt
-    );
-    if (openFollowUp) {
-      await db
-        .update(task)
-        .set({ dueAt: dayjs().add(3, "day").toDate() })
-        .where(eq(task.id, openFollowUp.id));
-    }
+    };
   }
 
   revalidatePath(`/leads/${leadId}`);
@@ -163,4 +152,6 @@ export async function sendLeadEmail(
   revalidatePath("/pipeline");
   revalidatePath("/tasks");
   revalidatePath("/");
+
+  return { suggestedTask };
 }
