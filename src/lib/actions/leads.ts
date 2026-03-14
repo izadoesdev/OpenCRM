@@ -29,7 +29,9 @@ async function getUser() {
   return session.user;
 }
 
-export type LeadRow = typeof lead.$inferSelect;
+export type LeadRow = typeof lead.$inferSelect & {
+  assignedUser: { id: string; name: string; email: string } | null;
+};
 
 export async function getLeads(opts?: {
   status?: string;
