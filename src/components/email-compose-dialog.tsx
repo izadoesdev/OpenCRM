@@ -174,7 +174,7 @@ export function EmailComposeDialog({
           </div>
 
           <DialogFooter className="flex items-center gap-2 sm:justify-between">
-            {gConn?.hasGmail && (
+            {!gConn?.hasGmail && (
               <SegmentedControl
                 onChange={setSendVia}
                 segments={[

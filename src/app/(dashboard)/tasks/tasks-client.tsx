@@ -3,15 +3,18 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   Add01Icon,
+  CallIcon,
   Delete02Icon,
   Edit02Icon,
+  LinkSquare01Icon,
+  Mail01Icon,
   RepeatIcon,
   Task01Icon,
   UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DateTimePicker } from "@/components/date-time-picker";
 import {
   MeetingDetail,
@@ -74,7 +77,12 @@ interface TaskWithLead {
   description: string | null;
   dueAt: Date;
   id: string;
-  lead: { id: string; name: string; status: string } | null;
+  lead: {
+    id: string;
+    name: string;
+    status: string;
+    phone?: string | null;
+  } | null;
   leadId: string;
   meetingLink: string | null;
   recurrence: string | null;
@@ -161,6 +169,43 @@ function TaskDetail({
         </div>
       )}
 
+      <div className="flex flex-wrap items-center gap-2">
+        {t.type === "call" && t.lead && (
+          <a
+            className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors hover:bg-muted/50"
+            href={`tel:${t.lead?.phone ?? ""}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <HugeiconsIcon icon={CallIcon} size={12} strokeWidth={1.5} />
+            Call
+          </a>
+        )}
+        {t.type === "email" && t.lead && (
+          <Link
+            className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors hover:bg-muted/50"
+            href={`/leads/${t.lead.id}`}
+          >
+            <HugeiconsIcon icon={Mail01Icon} size={12} strokeWidth={1.5} />
+            Send Email
+          </Link>
+        )}
+        {t.type === "linkedin" && (
+          <a
+            className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors hover:bg-muted/50"
+            href="https://linkedin.com"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            <HugeiconsIcon
+              icon={LinkSquare01Icon}
+              size={12}
+              strokeWidth={1.5}
+            />
+            Open LinkedIn
+          </a>
+        )}
+      </div>
+
       <div className="flex items-center gap-2 border-t pt-2">
         <Button onClick={() => setEditing(true)} size="sm" variant="outline">
           <HugeiconsIcon icon={Edit02Icon} size={12} strokeWidth={1.5} />
@@ -230,6 +275,35 @@ function TaskRow({
                 onClick={(e) => e.stopPropagation()}
               />
             )}
+            {t.type === "call" && !expanded && t.lead && (
+              <a
+                className="shrink-0 rounded-sm bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-400 transition-colors hover:bg-blue-500/20"
+                href={`tel:${t.lead?.phone ?? ""}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Call
+              </a>
+            )}
+            {t.type === "email" && !expanded && t.lead && (
+              <Link
+                className="shrink-0 rounded-sm bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-400 transition-colors hover:bg-violet-500/20"
+                href={`/leads/${t.lead.id}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Email
+              </Link>
+            )}
+            {t.type === "linkedin" && !expanded && (
+              <a
+                className="shrink-0 rounded-sm bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-400 transition-colors hover:bg-sky-500/20"
+                href="https://linkedin.com"
+                onClick={(e) => e.stopPropagation()}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                LinkedIn
+              </a>
+            )}
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-1.5">
             <TaskTypeBadge type={t.type} />
@@ -282,6 +356,12 @@ function AddTaskForm({
   const [syncCalendar, setSyncCalendar] = useState(true);
 
   const showMeetingFields = isMeetingType(type);
+
+  useEffect(() => {
+    if (type !== "follow_up" && type !== "call") {
+      setRecurrence("none");
+    }
+  }, [type]);
 
   function handleSubmit() {
     if (!(title.trim() && dueAt && leadId)) {
@@ -361,23 +441,25 @@ function AddTaskForm({
         </IconSelect>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <IconSelect
-          displayValue={
-            recurrence === "none"
-              ? "One-time"
-              : (RECURRENCE_LABELS[recurrence] ?? recurrence)
-          }
-          icon={RepeatIcon}
-          onValueChange={setRecurrence}
-          value={recurrence}
-        >
-          <SelectItem value="none">One-time</SelectItem>
-          {TASK_RECURRENCES.map((r) => (
-            <SelectItem key={r} value={r}>
-              {RECURRENCE_LABELS[r]}
-            </SelectItem>
-          ))}
-        </IconSelect>
+        {(type === "follow_up" || type === "call") && (
+          <IconSelect
+            displayValue={
+              recurrence === "none"
+                ? "One-time"
+                : (RECURRENCE_LABELS[recurrence] ?? recurrence)
+            }
+            icon={RepeatIcon}
+            onValueChange={setRecurrence}
+            value={recurrence}
+          >
+            <SelectItem value="none">One-time</SelectItem>
+            {TASK_RECURRENCES.map((r) => (
+              <SelectItem key={r} value={r}>
+                {RECURRENCE_LABELS[r]}
+              </SelectItem>
+            ))}
+          </IconSelect>
+        )}
         {showMeetingFields && (
           <Input
             onChange={(e) => setMeetingLink(e.target.value)}

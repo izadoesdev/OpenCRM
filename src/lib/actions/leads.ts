@@ -1,6 +1,17 @@
 "use server";
 
-import { and, desc, eq, ilike, inArray, or, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { db } from "@/db";
@@ -26,7 +37,7 @@ export async function getLeads(opts?: {
   order?: "asc" | "desc";
 }) {
   await getUser();
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [isNull(lead.archivedAt)];
 
   if (opts?.status && opts.status !== "all") {
     conditions.push(eq(lead.status, opts.status));
@@ -44,7 +55,7 @@ export async function getLeads(opts?: {
   }
 
   const rows = await db.query.lead.findMany({
-    where: conditions.length > 0 ? and(...conditions) : undefined,
+    where: and(...conditions),
     orderBy: [desc(lead.createdAt)],
     with: { assignedUser: true },
   });
@@ -83,6 +94,7 @@ export async function createLead(data: {
   website?: string;
   source?: string;
   value?: number;
+  customFields?: Record<string, string>;
 }) {
   const user = await getUser();
   const [row] = await db
@@ -91,6 +103,7 @@ export async function createLead(data: {
       ...data,
       source: data.source ?? "manual",
       value: data.value ?? 0,
+      customFields: data.customFields ?? {},
       assignedTo: user.id,
     })
     .returning();
@@ -122,6 +135,7 @@ export async function updateLead(
     value: number;
     plan: string;
     assignedTo: string | null;
+    customFields: Record<string, string>;
   }>
 ) {
   await getUser();
@@ -140,7 +154,7 @@ export async function updateLead(
 
 export async function deleteLead(id: string) {
   await getUser();
-  await db.delete(lead).where(eq(lead.id, id));
+  await db.update(lead).set({ archivedAt: new Date() }).where(eq(lead.id, id));
   revalidatePath("/leads");
   revalidatePath("/pipeline");
   revalidatePath("/");
@@ -167,10 +181,86 @@ export async function bulkUpdateStatus(ids: string[], status: string) {
 
 export async function bulkDeleteLeads(ids: string[]) {
   await getUser();
-  await db.delete(lead).where(inArray(lead.id, ids));
+  await db
+    .update(lead)
+    .set({ archivedAt: new Date() })
+    .where(inArray(lead.id, ids));
   revalidatePath("/leads");
   revalidatePath("/pipeline");
   revalidatePath("/");
+}
+
+export async function restoreLead(id: string) {
+  await getUser();
+  await db.update(lead).set({ archivedAt: null }).where(eq(lead.id, id));
+  revalidatePath("/leads");
+  revalidatePath("/pipeline");
+  revalidatePath("/");
+}
+
+export async function getArchivedLeads() {
+  await getUser();
+  const rows = await db.query.lead.findMany({
+    where: isNotNull(lead.archivedAt),
+    orderBy: [desc(lead.archivedAt)],
+    with: { assignedUser: true },
+  });
+  return rows;
+}
+
+export async function permanentlyDeleteLead(id: string) {
+  await getUser();
+  await db.delete(lead).where(eq(lead.id, id));
+  revalidatePath("/leads");
+  revalidatePath("/pipeline");
+  revalidatePath("/");
+}
+
+export async function importLeads(
+  rows: Array<{
+    name: string;
+    email: string;
+    company?: string;
+    title?: string;
+    phone?: string;
+    website?: string;
+    source?: string;
+    value?: number;
+  }>
+) {
+  const user = await getUser();
+  const values = rows.map((r) => ({
+    ...r,
+    source: r.source ?? "manual",
+    value: r.value ?? 0,
+    assignedTo: user.id,
+  }));
+
+  const inserted = await db.insert(lead).values(values).returning();
+
+  for (const row of inserted) {
+    await db.insert(activity).values({
+      leadId: row.id,
+      userId: user.id,
+      type: "status_change",
+      content: "Lead imported via CSV",
+      metadata: { newStatus: "new" },
+    });
+  }
+
+  revalidatePath("/leads");
+  revalidatePath("/pipeline");
+  revalidatePath("/");
+  return inserted.length;
+}
+
+export async function checkDuplicateEmail(email: string) {
+  await getUser();
+  const existing = await db.query.lead.findFirst({
+    where: eq(lead.email, email),
+    columns: { id: true, name: true, email: true, status: true },
+  });
+  return existing ?? null;
 }
 
 export async function getLeadCounts() {
@@ -181,6 +271,7 @@ export async function getLeadCounts() {
       count: sql<number>`count(*)::int`,
     })
     .from(lead)
+    .where(isNull(lead.archivedAt))
     .groupBy(lead.status);
 
   const counts: Record<string, number> = {};

@@ -12,6 +12,7 @@ import {
   MoreHorizontalIcon,
   Note01Icon,
   RepeatIcon,
+  Search01Icon,
   SentIcon,
   Task01Icon,
   UserIcon,
@@ -19,10 +20,11 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DateTimePicker } from "@/components/date-time-picker";
 import { EmailComposeDialog } from "@/components/email-compose-dialog";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
+import { LogActivityDialog } from "@/components/log-activity-dialog";
 import {
   MeetingDetail,
   MeetingLinkBadge,
@@ -48,13 +50,6 @@ import {
 } from "@/components/task-type-picker";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -64,8 +59,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { SelectItem } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { GmailMessage } from "@/lib/actions/gmail";
 import {
-  LEAD_PLANS,
   LEAD_STATUSES,
   RECURRENCE_LABELS,
   SOURCE_LABELS,
@@ -84,10 +79,16 @@ import {
   useGoogleConnection,
   useLead,
   useLeadEmails,
-  useLogOutreach,
+  useSendEmail,
   useTeamMembers,
   useToggleTask,
+  useUpdateLead,
 } from "@/lib/queries";
+import {
+  computeLeadScore,
+  getScoreBgColor,
+  getScoreLabel,
+} from "@/lib/scoring";
 import { formatCents, formatWebsite, isMeetingType } from "@/lib/utils";
 
 interface TeamMember {
@@ -106,6 +107,277 @@ const ACTIVITY_ICONS: Record<string, typeof Mail01Icon> = {
   status_change: Task01Icon,
 };
 
+const RE_EMAIL_NAME = /^"?([^"<]+)"?\s*</;
+
+function parseEmailName(raw: string): string {
+  const match = raw.match(RE_EMAIL_NAME);
+  if (match) {
+    return match[1].trim();
+  }
+  return raw.split("@")[0];
+}
+
+function isFromLead(from: string, leadEmail: string): boolean {
+  return from.toLowerCase().includes(leadEmail.toLowerCase());
+}
+
+const INITIAL_EMAIL_COUNT = 20;
+
+function EmailThreadView({
+  emails,
+  leadEmail,
+  leadId,
+  leadName,
+}: {
+  emails: GmailMessage[];
+  leadEmail: string;
+  leadId: string;
+  leadName: string;
+}) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "sent" | "received">("all");
+  const [showCount, setShowCount] = useState(INITIAL_EMAIL_COUNT);
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeBody, setComposeBody] = useState("");
+  const [showSubjectField, setShowSubjectField] = useState(false);
+
+  const sendEmail = useSendEmail();
+  const { data: gConn } = useGoogleConnection();
+
+  const sorted = [...emails].sort(
+    (a, b) => Number(b.internalDate) - Number(a.internalDate)
+  );
+
+  const filtered = sorted.filter((msg) => {
+    const received = isFromLead(msg.from, leadEmail);
+    if (filter === "sent" && received) {
+      return false;
+    }
+    if (filter === "received" && !received) {
+      return false;
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        msg.subject?.toLowerCase().includes(q) ||
+        msg.snippet?.toLowerCase().includes(q) ||
+        msg.from?.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  const visible = filtered.slice(0, showCount);
+  const hasMore = filtered.length > showCount;
+
+  function handleQuickSend() {
+    const body = composeBody.trim();
+    if (!body) {
+      return;
+    }
+    const subject = composeSubject.trim() || `Message to ${leadName}`;
+    sendEmail.mutate(
+      {
+        leadId,
+        data: { subject, body, sendVia: gConn?.hasGmail ? "gmail" : "resend" },
+      },
+      {
+        onSuccess: () => {
+          setComposeBody("");
+          setComposeSubject("");
+          setShowSubjectField(false);
+        },
+      }
+    );
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* toolbar */}
+      <div className="flex items-center gap-2 pb-3">
+        <div className="relative flex-1">
+          <HugeiconsIcon
+            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground"
+            icon={Search01Icon}
+            size={13}
+            strokeWidth={1.5}
+          />
+          <input
+            className="h-8 w-full rounded-lg border bg-background pr-3 pl-8 text-xs outline-none transition-colors placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-ring"
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search emails..."
+            type="text"
+            value={search}
+          />
+        </div>
+        <SegmentedControl
+          onChange={setFilter}
+          segments={[
+            { value: "all" as const, label: "All" },
+            { value: "received" as const, label: "In" },
+            { value: "sent" as const, label: "Out" },
+          ]}
+          value={filter}
+        />
+      </div>
+
+      {/* email count */}
+      {filtered.length > 0 && (
+        <div className="pb-2 text-[10px] text-muted-foreground">
+          {filtered.length} email{filtered.length === 1 ? "" : "s"}
+          {search && " matching"}
+          {filter !== "all" && ` · ${filter}`}
+        </div>
+      )}
+
+      {/* message list */}
+      <div className="min-h-0 flex-1 space-y-px overflow-y-auto">
+        {visible.length === 0 && (
+          <EmptyState
+            message={search ? "No emails match your search" : "No emails found"}
+          />
+        )}
+        {visible.map((msg) => {
+          const received = isFromLead(msg.from, leadEmail);
+          const sender = parseEmailName(msg.from);
+          const ts = dayjs(Number(msg.internalDate));
+          const expanded = openId === msg.id;
+
+          return (
+            <div key={msg.id}>
+              <button
+                className={`flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                  expanded ? "bg-muted/50" : "hover:bg-muted/30"
+                }`}
+                onClick={() => setOpenId(expanded ? null : msg.id)}
+                type="button"
+              >
+                <div
+                  className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full font-semibold text-[10px] ${
+                    received
+                      ? "bg-amber-500/15 text-amber-600"
+                      : "bg-primary/10 text-primary"
+                  }`}
+                >
+                  {sender.charAt(0).toUpperCase()}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-medium text-xs">
+                      {sender}
+                    </span>
+                    <Pill variant={received ? "muted" : "primary"}>
+                      {received ? "In" : "Out"}
+                    </Pill>
+                    <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+                      {ts.fromNow()}
+                    </span>
+                  </div>
+                  {msg.subject && (
+                    <p className="mt-0.5 truncate font-medium text-[11px] text-foreground/80">
+                      {msg.subject}
+                    </p>
+                  )}
+                  {!expanded && (
+                    <p className="mt-0.5 line-clamp-1 text-muted-foreground text-xs">
+                      {msg.snippet}
+                    </p>
+                  )}
+                </div>
+              </button>
+
+              {expanded && (
+                <div className="mx-3 mb-2 rounded-lg border bg-background p-3">
+                  <div className="mb-2 flex flex-wrap items-center gap-x-3 text-[10px] text-muted-foreground">
+                    <span>{msg.from}</span>
+                    <span className="text-muted-foreground/40">→</span>
+                    <span>{msg.to}</span>
+                    <span className="ml-auto font-mono">
+                      {ts.format("MMM D, YYYY h:mm A")}
+                    </span>
+                  </div>
+                  {msg.bodyHtml ? (
+                    <div
+                      className="max-h-72 overflow-y-auto text-[13px] leading-relaxed **:max-w-full [&_a]:text-primary [&_a]:underline [&_blockquote]:border-muted [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_img]:max-w-full [&_img]:rounded"
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: email HTML
+                      dangerouslySetInnerHTML={{ __html: msg.bodyHtml }}
+                    />
+                  ) : (
+                    <p className="max-h-72 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed">
+                      {msg.bodyText || msg.snippet}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {hasMore && (
+          <button
+            className="flex w-full items-center justify-center gap-1 rounded-lg py-2 text-muted-foreground text-xs transition-colors hover:bg-muted/30 hover:text-foreground"
+            onClick={() => setShowCount((c) => c + INITIAL_EMAIL_COUNT)}
+            type="button"
+          >
+            Show older ({filtered.length - showCount} more)
+          </button>
+        )}
+      </div>
+
+      {/* inline compose */}
+      <div className="border-t pt-3">
+        {showSubjectField && (
+          <input
+            className="mb-2 h-8 w-full rounded-lg border bg-background px-3 text-xs outline-none transition-colors placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-ring"
+            onChange={(e) => setComposeSubject(e.target.value)}
+            placeholder="Subject"
+            type="text"
+            value={composeSubject}
+          />
+        )}
+        <div className="flex items-end gap-2">
+          <textarea
+            className="block max-h-28 min-h-[36px] flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-xs leading-relaxed outline-none transition-colors placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-ring"
+            onChange={(e) => setComposeBody(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                handleQuickSend();
+              }
+            }}
+            placeholder={`Message ${leadName}... (Cmd+Enter)`}
+            rows={1}
+            value={composeBody}
+          />
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              className={`flex size-8 items-center justify-center rounded-lg transition-colors ${
+                showSubjectField
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              }`}
+              onClick={() => setShowSubjectField((s) => !s)}
+              title="Toggle subject line"
+              type="button"
+            >
+              <HugeiconsIcon icon={Edit02Icon} size={13} strokeWidth={1.5} />
+            </button>
+            <Button
+              disabled={!composeBody.trim() || sendEmail.isPending}
+              onClick={handleQuickSend}
+              size="sm"
+            >
+              {sendEmail.isPending ? "..." : "Send"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function LeadDetailClient({ leadId }: { leadId: string }) {
   const router = useRouter();
   const { data: lead, isLoading, isError } = useLead(leadId);
@@ -113,8 +385,8 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
 
   const changeStatus = useChangeLeadStatus();
   const addNote = useAddNote();
-  const logOutreach = useLogOutreach();
   const deleteLeadMut = useDeleteLead();
+  const updateLeadMut = useUpdateLead();
   const assignLead = useAssignLead();
   const { data: teamMembers = [] as TeamMember[] } = useTeamMembers();
   const { data: gConn } = useGoogleConnection();
@@ -122,9 +394,12 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
 
   const [showEdit, setShowEdit] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
+  const [showLogActivity, setShowLogActivity] = useState(false);
   const [leftTab, setLeftTab] = useState<"activity" | "emails">("activity");
   const [noteText, setNoteText] = useState("");
-  const [showPlanPicker, setShowPlanPicker] = useState(false);
+  const [addingField, setAddingField] = useState(false);
+  const [fieldKey, setFieldKey] = useState("");
+  const [fieldValue, setFieldValue] = useState("");
 
   if (isLoading) {
     return <PageSkeleton />;
@@ -151,15 +426,14 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
 
   function handleStatusChange(status: string) {
     if (status === "converted") {
-      setShowPlanPicker(true);
+      changeStatus.mutate({
+        leadId: id,
+        status: "converted",
+        opts: { plan: "free" },
+      });
       return;
     }
     changeStatus.mutate({ leadId: id, status });
-  }
-
-  function handleConvertWithPlan(plan: string) {
-    setShowPlanPicker(false);
-    changeStatus.mutate({ leadId: id, status: "converted", opts: { plan } });
   }
 
   function handleAddNote() {
@@ -222,33 +496,13 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                   />
                   Edit Lead
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() =>
-                    logOutreach.mutate({
-                      leadId: id,
-                      type: "outreach_call",
-                      content: "Logged a call",
-                    })
-                  }
-                >
-                  <HugeiconsIcon icon={CallIcon} size={14} strokeWidth={1.5} />
-                  Log Call
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() =>
-                    logOutreach.mutate({
-                      leadId: id,
-                      type: "outreach_linkedin",
-                      content: "Logged LinkedIn outreach",
-                    })
-                  }
-                >
+                <DropdownMenuItem onClick={() => setShowLogActivity(true)}>
                   <HugeiconsIcon
-                    icon={LinkSquare01Icon}
+                    icon={Task01Icon}
                     size={14}
                     strokeWidth={1.5}
                   />
-                  Log LinkedIn
+                  Log Activity
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -264,7 +518,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                     size={14}
                     strokeWidth={1.5}
                   />
-                  Delete Lead
+                  Archive Lead
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -286,6 +540,25 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                     {lead.name}
                   </h1>
                   <StatusBadge status={lead.status} />
+                  {(() => {
+                    const score = computeLeadScore({
+                      value: lead.value,
+                      status: lead.status,
+                      activitiesCount: lead.activities?.length ?? 0,
+                      tasksCount: lead.tasks?.length ?? 0,
+                      daysSinceCreated: Math.floor(
+                        (Date.now() - new Date(lead.createdAt).getTime()) /
+                          (1000 * 60 * 60 * 24)
+                      ),
+                    });
+                    return (
+                      <span
+                        className={`rounded-sm px-2 py-0.5 font-mono text-xs ${getScoreBgColor(score)}`}
+                      >
+                        {score} {getScoreLabel(score)}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <p className="truncate text-muted-foreground text-sm">
                   {[lead.title, lead.company].filter(Boolean).join(" at ") ||
@@ -384,35 +657,12 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
             )}
 
             {leftTab === "emails" && (
-              <>
-                {leadEmails.length === 0 && (
-                  <EmptyState message="No emails found" />
-                )}
-                <div className="space-y-2">
-                  {leadEmails.map((email) => (
-                    <div className="rounded-md border p-3" key={email.id}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-sm">
-                            {email.subject || "(no subject)"}
-                          </p>
-                          <p className="mt-0.5 truncate text-muted-foreground text-xs">
-                            {email.from}
-                          </p>
-                        </div>
-                        <span className="shrink-0 text-[10px] text-muted-foreground">
-                          {dayjs(Number(email.internalDate)).format(
-                            "MMM D, h:mm A"
-                          )}
-                        </span>
-                      </div>
-                      <p className="mt-2 line-clamp-3 text-muted-foreground text-xs">
-                        {email.snippet}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </>
+              <EmailThreadView
+                emails={leadEmails}
+                leadEmail={lead.email}
+                leadId={id}
+                leadName={lead.name}
+              />
             )}
           </div>
         </div>
@@ -467,6 +717,74 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                   {dayjs(lead.createdAt).format("MMM D, YYYY")}
                 </span>
               </DetailField>
+              {lead.customFields &&
+                Object.keys(lead.customFields as Record<string, string>)
+                  .length > 0 &&
+                Object.entries(lead.customFields as Record<string, string>).map(
+                  ([key, val]) => (
+                    <DetailField key={key} label={key}>
+                      {val}
+                    </DetailField>
+                  )
+                )}
+              <div className="mt-2">
+                {addingField ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      className="h-7 w-24 text-xs"
+                      onChange={(e) => setFieldKey(e.target.value)}
+                      placeholder="Field name"
+                      value={fieldKey}
+                    />
+                    <Input
+                      className="h-7 flex-1 text-xs"
+                      onChange={(e) => setFieldValue(e.target.value)}
+                      placeholder="Value"
+                      value={fieldValue}
+                    />
+                    <Button
+                      disabled={!(fieldKey.trim() && fieldValue.trim())}
+                      onClick={() => {
+                        const current = (lead.customFields ?? {}) as Record<
+                          string,
+                          string
+                        >;
+                        updateLeadMut.mutate({
+                          id: lead.id,
+                          data: {
+                            customFields: {
+                              ...current,
+                              [fieldKey.trim()]: fieldValue.trim(),
+                            },
+                          },
+                        });
+                        setFieldKey("");
+                        setFieldValue("");
+                        setAddingField(false);
+                      }}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      onClick={() => setAddingField(false)}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    className="text-muted-foreground text-xs hover:text-foreground"
+                    onClick={() => setAddingField(true)}
+                    type="button"
+                  >
+                    + Add field
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -545,6 +863,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
 
           <LeadTasksSidebar
             leadId={id}
+            leadPhone={lead.phone}
             tasks={lead.tasks}
             teamMembers={teamMembers as TeamMember[]}
           />
@@ -552,6 +871,11 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
       </div>
 
       <LeadFormDialog lead={lead} onOpenChange={setShowEdit} open={showEdit} />
+      <LogActivityDialog
+        leadId={id}
+        onOpenChange={setShowLogActivity}
+        open={showLogActivity}
+      />
       <EmailComposeDialog
         leadId={id}
         leadName={lead.name}
@@ -559,27 +883,6 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
         open={showEmail}
         templates={templates}
       />
-      <Dialog onOpenChange={setShowPlanPicker} open={showPlanPicker}>
-        <DialogContent className="sm:max-w-xs">
-          <DialogHeader>
-            <DialogTitle>Select Plan</DialogTitle>
-            <DialogDescription>
-              Choose the plan for this converted lead.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-2">
-            {LEAD_PLANS.map((p) => (
-              <Button
-                key={p}
-                onClick={() => handleConvertWithPlan(p)}
-                variant="outline"
-              >
-                {p.charAt(0).toUpperCase() + p.slice(1)}
-              </Button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -630,10 +933,12 @@ interface LeadTask {
 
 function LeadTasksSidebar({
   leadId,
+  leadPhone,
   tasks,
   teamMembers,
 }: {
   leadId: string;
+  leadPhone?: string | null;
   tasks: LeadTask[];
   teamMembers: TeamMember[];
 }) {
@@ -652,6 +957,12 @@ function LeadTasksSidebar({
   const [newTaskRecurrence, setNewTaskRecurrence] = useState<string>("none");
   const [newTaskMeetingLink, setNewTaskMeetingLink] = useState("");
   const [newTaskSyncCalendar, setNewTaskSyncCalendar] = useState(true);
+
+  useEffect(() => {
+    if (newTaskType !== "follow_up" && newTaskType !== "call") {
+      setNewTaskRecurrence("none");
+    }
+  }, [newTaskType]);
 
   function handleAddTask() {
     if (!(newTaskTitle.trim() && newTaskDue)) {
@@ -744,23 +1055,26 @@ function LeadTasksSidebar({
                 </SelectItem>
               ))}
             </IconSelect>
-            <IconSelect
-              displayValue={
-                newTaskRecurrence === "none"
-                  ? "One-time"
-                  : (RECURRENCE_LABELS[newTaskRecurrence] ?? newTaskRecurrence)
-              }
-              icon={RepeatIcon}
-              onValueChange={setNewTaskRecurrence}
-              value={newTaskRecurrence}
-            >
-              <SelectItem value="none">One-time</SelectItem>
-              {TASK_RECURRENCES.map((r) => (
-                <SelectItem key={r} value={r}>
-                  {RECURRENCE_LABELS[r]}
-                </SelectItem>
-              ))}
-            </IconSelect>
+            {(newTaskType === "follow_up" || newTaskType === "call") && (
+              <IconSelect
+                displayValue={
+                  newTaskRecurrence === "none"
+                    ? "One-time"
+                    : (RECURRENCE_LABELS[newTaskRecurrence] ??
+                      newTaskRecurrence)
+                }
+                icon={RepeatIcon}
+                onValueChange={setNewTaskRecurrence}
+                value={newTaskRecurrence}
+              >
+                <SelectItem value="none">One-time</SelectItem>
+                {TASK_RECURRENCES.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {RECURRENCE_LABELS[r]}
+                  </SelectItem>
+                ))}
+              </IconSelect>
+            )}
           </div>
           {showMeetingFields && (
             <>
@@ -813,6 +1127,7 @@ function LeadTasksSidebar({
               expanded={expandedTaskId === t.id}
               key={t.id}
               leadId={leadId}
+              leadPhone={leadPhone}
               onDelete={deleteTaskMut}
               onToggle={toggleTask}
               onToggleExpand={() =>
@@ -834,6 +1149,7 @@ function LeadTasksSidebar({
                   expanded={expandedTaskId === t.id}
                   key={t.id}
                   leadId={leadId}
+                  leadPhone={leadPhone}
                   onDelete={deleteTaskMut}
                   onToggle={toggleTask}
                   onToggleExpand={() =>
@@ -853,6 +1169,7 @@ function LeadTasksSidebar({
 function LeadTaskDetail({
   task: t,
   leadId,
+  leadPhone,
   onDelete,
 }: {
   task: {
@@ -866,6 +1183,7 @@ function LeadTaskDetail({
     user: { id: string; name: string } | null;
   };
   leadId: string;
+  leadPhone?: string | null;
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -907,6 +1225,45 @@ function LeadTaskDetail({
         </div>
       )}
 
+      <div className="flex flex-wrap items-center gap-2">
+        {t.type === "call" && leadPhone && (
+          <a
+            className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors hover:bg-muted/50"
+            href={`tel:${leadPhone}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <HugeiconsIcon icon={CallIcon} size={12} strokeWidth={1.5} />
+            Call
+          </a>
+        )}
+        {t.type === "email" && (
+          <Link
+            className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors hover:bg-muted/50"
+            href={`/leads/${leadId}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <HugeiconsIcon icon={Mail01Icon} size={12} strokeWidth={1.5} />
+            Send Email
+          </Link>
+        )}
+        {t.type === "linkedin" && (
+          <a
+            className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors hover:bg-muted/50"
+            href="https://linkedin.com"
+            onClick={(e) => e.stopPropagation()}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            <HugeiconsIcon
+              icon={LinkSquare01Icon}
+              size={12}
+              strokeWidth={1.5}
+            />
+            Open LinkedIn
+          </a>
+        )}
+      </div>
+
       <div className="flex items-center gap-2 border-t pt-2">
         <Button onClick={() => setEditing(true)} size="sm" variant="outline">
           <HugeiconsIcon icon={Edit02Icon} size={12} strokeWidth={1.5} />
@@ -932,6 +1289,7 @@ function LeadTaskDetail({
 function LeadTaskRow({
   task: t,
   leadId,
+  leadPhone,
   expanded,
   onToggleExpand,
   onToggle,
@@ -950,6 +1308,7 @@ function LeadTaskRow({
     user: { id: string; name: string } | null;
   };
   leadId: string;
+  leadPhone?: string | null;
   expanded: boolean;
   onToggleExpand: () => void;
   onToggle: ReturnType<typeof useToggleTask>;
@@ -990,6 +1349,35 @@ function LeadTaskRow({
                 onClick={(e) => e.stopPropagation()}
               />
             )}
+            {t.type === "call" && !expanded && leadPhone && (
+              <a
+                className="shrink-0 rounded-sm bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-400 transition-colors hover:bg-blue-500/20"
+                href={`tel:${leadPhone}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Call
+              </a>
+            )}
+            {t.type === "email" && !expanded && (
+              <Link
+                className="shrink-0 rounded-sm bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-400 transition-colors hover:bg-violet-500/20"
+                href={`/leads/${leadId}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Email
+              </Link>
+            )}
+            {t.type === "linkedin" && !expanded && (
+              <a
+                className="shrink-0 rounded-sm bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-400 transition-colors hover:bg-sky-500/20"
+                href="https://linkedin.com"
+                onClick={(e) => e.stopPropagation()}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                LinkedIn
+              </a>
+            )}
           </span>
           <span className="mt-0.5 flex flex-wrap items-center gap-1">
             <TaskTypeBadge type={t.type} />
@@ -1007,6 +1395,7 @@ function LeadTaskRow({
         <div className="border-border/50 border-t px-2 pt-2 pb-2 pl-8">
           <LeadTaskDetail
             leadId={leadId}
+            leadPhone={leadPhone}
             onDelete={() => onDelete.mutate({ id: t.id, leadId })}
             task={t}
           />

@@ -7,12 +7,13 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
 import { MeetingLinkPill } from "@/components/meeting-detail";
 import { Pill, SectionHeader, UserAvatar } from "@/components/micro";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState, PageSkeleton } from "@/components/page-skeleton";
+import { SegmentedControl } from "@/components/segmented-control";
 import { StatusBadge } from "@/components/status-badge";
 import { TaskCheckbox } from "@/components/task-checkbox";
 import { RecurrenceBadge, TaskTypeBadge } from "@/components/task-type-picker";
@@ -38,7 +39,25 @@ const ACTIVE_STATUSES = LEAD_STATUSES.filter(
 );
 
 export function DashboardClient() {
-  const { data, isLoading } = useDashboard();
+  const [dateRange, setDateRange] = useState<
+    "all" | "week" | "month" | "quarter"
+  >("all");
+  const dateOpts = useMemo(() => {
+    if (dateRange === "all") {
+      return undefined;
+    }
+    const now = dayjs();
+    let from: dayjs.Dayjs;
+    if (dateRange === "week") {
+      from = now.subtract(7, "day");
+    } else if (dateRange === "month") {
+      from = now.subtract(1, "month");
+    } else {
+      from = now.subtract(3, "month");
+    }
+    return { from: from.toISOString(), to: now.toISOString() };
+  }, [dateRange]);
+  const { data, isLoading } = useDashboard(dateOpts);
   const toggleTask = useToggleTask();
   const { data: gConn } = useGoogleConnection();
   const { data: calEvents = [] as CalendarEvent[] } = useCalendarEvents({
@@ -120,6 +139,16 @@ export function DashboardClient() {
                 </span>
               </span>
             </div>
+            <SegmentedControl
+              onChange={setDateRange}
+              segments={[
+                { value: "all" as const, label: "All Time" },
+                { value: "week" as const, label: "7d" },
+                { value: "month" as const, label: "30d" },
+                { value: "quarter" as const, label: "90d" },
+              ]}
+              value={dateRange}
+            />
           </div>
           <Button onClick={() => setShowForm(true)} size="sm">
             <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />

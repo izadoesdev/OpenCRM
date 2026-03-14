@@ -5,21 +5,32 @@ import { toast } from "sonner";
 import {
   getDashboardStats,
   getPipelineCounts,
+  getPipelineVelocity,
   getRecentLeads,
+  getReportingData,
+  getStatusChangeHistory,
   getUpcomingTasks,
 } from "@/lib/actions/dashboard";
 import {
+  createEmailTemplate,
+  deleteEmailTemplate,
   getEmailTemplates,
   sendLeadEmail,
+  updateEmailTemplate,
 } from "@/lib/actions/email-templates";
 import {
   bulkDeleteLeads,
   bulkUpdateStatus,
+  checkDuplicateEmail,
   createLead,
   deleteLead,
+  getArchivedLeads,
   getLead,
   getLeadCounts,
   getLeads,
+  importLeads,
+  permanentlyDeleteLead,
+  restoreLead,
   updateLead,
 } from "@/lib/actions/leads";
 import { addNote, changeLeadStatus, logOutreach } from "@/lib/actions/status";
@@ -50,6 +61,7 @@ import { checkGoogleConnection } from "./google";
 
 export const queryKeys = {
   leads: ["leads"] as const,
+  archivedLeads: ["leads", "archived"] as const,
   lead: (id: string) => ["leads", id] as const,
   leadCounts: ["leads", "counts"] as const,
   tasks: ["tasks"] as const,
@@ -80,6 +92,15 @@ export function useLead(id: string) {
   });
 }
 
+export function useCheckDuplicateEmail(email: string) {
+  return useQuery({
+    queryKey: ["check-duplicate", email],
+    queryFn: () => checkDuplicateEmail(email),
+    enabled: email.length > 3 && email.includes("@"),
+    staleTime: 30 * 1000,
+  });
+}
+
 export function useLeadCounts() {
   return useQuery({
     queryKey: queryKeys.leadCounts,
@@ -102,16 +123,45 @@ export function useLeadTasks(leadId: string) {
   });
 }
 
-export function useDashboard() {
+export function usePipelineVelocity() {
   return useQuery({
-    queryKey: queryKeys.dashboard,
+    queryKey: ["pipeline-velocity"],
+    queryFn: () => getPipelineVelocity(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useReportingData() {
+  return useQuery({
+    queryKey: ["reporting"],
+    queryFn: () => getReportingData(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useStatusChangeHistory(opts?: {
+  from?: string;
+  to?: string;
+  fromStatus?: string;
+  toStatus?: string;
+}) {
+  return useQuery({
+    queryKey: ["audit-trail", opts],
+    queryFn: () => getStatusChangeHistory(opts),
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useDashboard(opts?: { from?: string; to?: string }) {
+  return useQuery({
+    queryKey: [...queryKeys.dashboard, opts?.from, opts?.to],
     queryFn: async () => {
       const [stats, recentLeads, upcomingTasks, pipelineCounts] =
         await Promise.all([
-          getDashboardStats(),
-          getRecentLeads(),
+          getDashboardStats(opts),
+          getRecentLeads(opts),
           getUpcomingTasks(),
-          getPipelineCounts(),
+          getPipelineCounts(opts),
         ]);
       return { stats, recentLeads, upcomingTasks, pipelineCounts };
     },
@@ -122,6 +172,48 @@ export function useEmailTemplates() {
   return useQuery({
     queryKey: queryKeys.emailTemplates,
     queryFn: () => getEmailTemplates(),
+  });
+}
+
+export function useCreateEmailTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: createEmailTemplate,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.emailTemplates });
+      toast.success("Template created");
+    },
+    onError: () => toast.error("Failed to create template"),
+  });
+}
+
+export function useUpdateEmailTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: { name?: string; subject?: string; body?: string };
+    }) => updateEmailTemplate(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.emailTemplates });
+      toast.success("Template updated");
+    },
+    onError: () => toast.error("Failed to update template"),
+  });
+}
+
+export function useDeleteEmailTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteEmailTemplate,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.emailTemplates });
+      toast.success("Template deleted");
+    },
+    onError: () => toast.error("Failed to delete template"),
   });
 }
 
@@ -211,6 +303,18 @@ export function useCreateLead() {
   });
 }
 
+export function useImportLeads() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: importLeads,
+    onSuccess: (count) => {
+      inv.leads();
+      toast.success(`${count} lead${count === 1 ? "" : "s"} imported`);
+    },
+    onError: () => toast.error("Failed to import leads"),
+  });
+}
+
 export function useUpdateLead() {
   const inv = useInvalidate();
   return useMutation({
@@ -233,13 +337,15 @@ export function useUpdateLead() {
 
 export function useDeleteLead() {
   const inv = useInvalidate();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: deleteLead,
     onSuccess: () => {
       inv.leads();
-      toast.success("Lead deleted");
+      qc.invalidateQueries({ queryKey: queryKeys.archivedLeads });
+      toast.success("Lead archived");
     },
-    onError: () => toast.error("Failed to delete lead"),
+    onError: () => toast.error("Failed to archive lead"),
   });
 }
 
@@ -260,13 +366,48 @@ export function useBulkUpdateStatus() {
 
 export function useBulkDeleteLeads() {
   const inv = useInvalidate();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: bulkDeleteLeads,
     onSuccess: (_, ids) => {
       inv.leads();
-      toast.success(`${ids.length} lead${ids.length > 1 ? "s" : ""} deleted`);
+      qc.invalidateQueries({ queryKey: queryKeys.archivedLeads });
+      toast.success(`${ids.length} lead${ids.length > 1 ? "s" : ""} archived`);
     },
-    onError: () => toast.error("Failed to delete leads"),
+    onError: () => toast.error("Failed to archive leads"),
+  });
+}
+
+export function useArchivedLeads() {
+  return useQuery({
+    queryKey: queryKeys.archivedLeads,
+    queryFn: () => getArchivedLeads(),
+  });
+}
+
+export function useRestoreLead() {
+  const inv = useInvalidate();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: restoreLead,
+    onSuccess: () => {
+      inv.leads();
+      qc.invalidateQueries({ queryKey: queryKeys.archivedLeads });
+      toast.success("Lead restored");
+    },
+    onError: () => toast.error("Failed to restore lead"),
+  });
+}
+
+export function usePermanentlyDeleteLead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: permanentlyDeleteLead,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.archivedLeads });
+      toast.success("Lead permanently deleted");
+    },
+    onError: () => toast.error("Failed to delete lead"),
   });
 }
 

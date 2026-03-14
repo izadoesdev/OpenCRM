@@ -6,7 +6,7 @@ import { Pill, UserAvatar } from "@/components/micro";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/page-skeleton";
 import {
-  LEAD_STATUSES,
+  ACTIVE_LEAD_STATUSES,
   STATUS_DOT_COLORS,
   STATUS_LABELS,
 } from "@/lib/constants";
@@ -19,7 +19,7 @@ export function PipelineClient() {
   const changeStatus = useChangeLeadStatus();
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
 
-  const columns = LEAD_STATUSES.map((status) => ({
+  const columns = ACTIVE_LEAD_STATUSES.map((status) => ({
     status,
     label: STATUS_LABELS[status],
     leads: leads.filter((l) => l.status === status),

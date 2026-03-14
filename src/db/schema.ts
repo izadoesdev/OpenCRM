@@ -105,14 +105,19 @@ export const lead = pgTable(
     convertedAt: timestamp("converted_at"),
     churnedAt: timestamp("churned_at"),
     lostAt: timestamp("lost_at"),
+    customFields: jsonb("custom_fields")
+      .$type<Record<string, string>>()
+      .default({}),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
+    archivedAt: timestamp("archived_at"),
   },
   (table) => [
     index("lead_status_idx").on(table.status),
+    index("lead_archivedAt_idx").on(table.archivedAt),
     index("lead_assignedTo_idx").on(table.assignedTo),
     index("lead_email_idx").on(table.email),
   ]

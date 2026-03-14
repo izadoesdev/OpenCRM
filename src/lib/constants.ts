@@ -9,6 +9,10 @@ export const LEAD_STATUSES = [
   "churned",
 ] as const;
 
+export const ACTIVE_LEAD_STATUSES = LEAD_STATUSES.filter(
+  (s) => s !== "churned"
+) as readonly string[];
+
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 export const LEAD_SOURCES = [

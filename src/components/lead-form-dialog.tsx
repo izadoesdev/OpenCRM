@@ -19,7 +19,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LEAD_SOURCES, SOURCE_LABELS } from "@/lib/constants";
-import { useCreateLead, useUpdateLead } from "@/lib/queries";
+import {
+  useCheckDuplicateEmail,
+  useCreateLead,
+  useUpdateLead,
+} from "@/lib/queries";
 
 const COMMON_TITLES = [
   "CEO",
@@ -71,6 +75,8 @@ export function LeadFormDialog({
   const [website, setWebsite] = useState("");
   const [source, setSource] = useState("manual");
   const [valueDollars, setValueDollars] = useState("");
+
+  const duplicateCheck = useCheckDuplicateEmail(email);
 
   useEffect(() => {
     if (open) {
@@ -162,6 +168,12 @@ export function LeadFormDialog({
                 type="email"
                 value={email}
               />
+              {duplicateCheck?.data && !lead && (
+                <p className="text-amber-400 text-xs">
+                  A lead with this email already exists:{" "}
+                  {duplicateCheck.data.name} ({duplicateCheck.data.status})
+                </p>
+              )}
             </div>
           </div>
 

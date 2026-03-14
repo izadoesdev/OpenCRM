@@ -5,6 +5,8 @@ import {
   DashboardBrowsingIcon,
   FilterIcon,
   Logout01Icon,
+  PresentationBarChart01Icon,
+  Settings01Icon,
   Task01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -30,6 +32,8 @@ const navItems = [
   { title: "Leads", href: "/leads", icon: Contact01Icon },
   { title: "Pipeline", href: "/pipeline", icon: FilterIcon },
   { title: "Tasks", href: "/tasks", icon: Task01Icon },
+  { title: "Reporting", href: "/reporting", icon: PresentationBarChart01Icon },
+  { title: "Settings", href: "/settings", icon: Settings01Icon },
 ];
 
 function googleStatusColor(gConn: {
