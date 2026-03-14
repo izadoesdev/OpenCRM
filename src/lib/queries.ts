@@ -82,6 +82,8 @@ export function useLeads() {
   return useQuery({
     queryKey: queryKeys.leads,
     queryFn: () => getLeads(),
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -89,6 +91,8 @@ export function useLead(id: string) {
   return useQuery({
     queryKey: queryKeys.lead(id),
     queryFn: () => getLead(id),
+    staleTime: 15 * 1000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -105,6 +109,7 @@ export function useLeadCounts() {
   return useQuery({
     queryKey: queryKeys.leadCounts,
     queryFn: () => getLeadCounts(),
+    staleTime: 30 * 1000,
   });
 }
 
@@ -113,6 +118,9 @@ export function useTasks(opts?: { userId?: string | null }) {
     queryKey: [...queryKeys.tasks, opts?.userId ?? "all"],
     queryFn: () =>
       getTasks({ showCompleted: true, userId: opts?.userId ?? undefined }),
+    staleTime: 15 * 1000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60 * 1000,
   });
 }
 
@@ -120,6 +128,8 @@ export function useLeadTasks(leadId: string) {
   return useQuery({
     queryKey: [...queryKeys.tasks, "lead", leadId],
     queryFn: () => getLeadTasks(leadId),
+    staleTime: 15 * 1000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -165,6 +175,9 @@ export function useDashboard(opts?: { from?: string; to?: string }) {
         ]);
       return { stats, recentLeads, upcomingTasks, pipelineCounts };
     },
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 2 * 60 * 1000,
   });
 }
 
@@ -172,6 +185,7 @@ export function useEmailTemplates() {
   return useQuery({
     queryKey: queryKeys.emailTemplates,
     queryFn: () => getEmailTemplates(),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -246,7 +260,9 @@ export function useCalendarEvents(opts?: { maxResults?: number }) {
   return useQuery({
     queryKey: queryKeys.calendarEvents,
     queryFn: () => getUpcomingCalendarEvents(opts),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 2 * 60 * 1000,
   });
 }
 
@@ -255,7 +271,9 @@ export function useLeadEmails(email: string | null) {
     queryKey: queryKeys.leadEmails(email ?? ""),
     queryFn: () => getLeadEmails(email ?? ""),
     enabled: !!email,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60 * 1000,
   });
 }
 
@@ -500,9 +518,7 @@ export function useSendEmail() {
     }) => sendLeadEmail(leadId, data),
     onSuccess: (_, { leadId, data }) => {
       inv.lead(leadId);
-      if (data.sendVia === "gmail") {
-        qc.invalidateQueries({ queryKey: ["lead-emails"] });
-      }
+      qc.invalidateQueries({ queryKey: ["lead-emails"] });
       toast.success(data.sendVia === "gmail" ? "Sent via Gmail" : "Email sent");
     },
     onError: () => toast.error("Failed to send email"),

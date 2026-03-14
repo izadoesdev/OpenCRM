@@ -56,7 +56,7 @@ export function PipelineClient() {
         <PageHeader>
           <h1 className="font-semibold text-lg tracking-tight">Pipeline</h1>
         </PageHeader>
-        <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
+        <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-5">
           {Array.from({ length: 5 }).map((_, i) => (
             <div
               className="w-72 shrink-0 animate-pulse rounded-sm border bg-card/50"
@@ -90,7 +90,7 @@ export function PipelineClient() {
         <h1 className="font-semibold text-lg tracking-tight">Pipeline</h1>
       </PageHeader>
 
-      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
+      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-5">
         {columns.map((col) => {
           const isSameColumn = draggedLead?.status === col.status;
           return (

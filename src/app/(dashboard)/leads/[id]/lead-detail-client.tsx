@@ -49,6 +49,7 @@ import {
   TaskTypePicker,
 } from "@/components/task-type-picker";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1083,15 +1084,16 @@ function LeadTasksSidebar({
                 placeholder="Meeting link (or leave empty for Meet)"
                 value={newTaskMeetingLink}
               />
-              <label className="flex items-center gap-2 text-muted-foreground text-xs">
-                <input
+              <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                <Checkbox
                   checked={newTaskSyncCalendar}
-                  className="rounded border"
-                  onChange={(e) => setNewTaskSyncCalendar(e.target.checked)}
-                  type="checkbox"
+                  id="sync-cal-lead"
+                  onCheckedChange={(checked) => setNewTaskSyncCalendar(checked)}
                 />
-                Create Google Calendar event with Meet link
-              </label>
+                <label className="cursor-pointer" htmlFor="sync-cal-lead">
+                  Create Google Calendar event with Meet link
+                </label>
+              </div>
             </>
           )}
           <div className="flex justify-end gap-2">

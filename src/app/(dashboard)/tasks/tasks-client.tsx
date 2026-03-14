@@ -39,6 +39,7 @@ import {
   TaskTypePicker,
 } from "@/components/task-type-picker";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -469,15 +470,16 @@ function AddTaskForm({
         )}
       </div>
       {showMeetingFields && (
-        <label className="flex items-center gap-2 text-muted-foreground text-xs">
-          <input
+        <div className="flex items-center gap-2 text-muted-foreground text-xs">
+          <Checkbox
             checked={syncCalendar}
-            className="rounded border"
-            onChange={(e) => setSyncCalendar(e.target.checked)}
-            type="checkbox"
+            id="sync-calendar"
+            onCheckedChange={(checked) => setSyncCalendar(checked)}
           />
-          Create Google Calendar event with Meet link
-        </label>
+          <label className="cursor-pointer" htmlFor="sync-calendar">
+            Create Google Calendar event with Meet link
+          </label>
+        </div>
       )}
       <div className="flex justify-end gap-2">
         <Button onClick={onClose} size="sm" variant="ghost">
@@ -682,7 +684,7 @@ export function TasksPageClient() {
         </div>
       </PageHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
         {showAddTask && (
           <AddTaskForm
             onClose={() => setShowAddTask(false)}

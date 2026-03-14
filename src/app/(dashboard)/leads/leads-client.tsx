@@ -17,6 +17,7 @@ import { useState } from "react";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
 import { UserAvatar } from "@/components/micro";
 import { PageHeader } from "@/components/page-header";
+import { PageSkeleton } from "@/components/page-skeleton";
 import { StatusBadge, StatusDot } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -242,7 +243,7 @@ function LeadPreviewPanel({
         </div>
 
         {isLoading || !lead ? (
-          <div className="flex-1 p-4">
+          <div className="flex-1 p-5">
             <div className="space-y-3">
               <div className="h-8 w-48 animate-pulse rounded bg-muted/60" />
               <div className="h-4 w-32 animate-pulse rounded bg-muted/40" />
@@ -250,7 +251,7 @@ function LeadPreviewPanel({
             </div>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
             <div className="flex items-center gap-3">
               <UserAvatar name={lead.name} size="lg" />
               <div className="min-w-0 flex-1">
@@ -509,31 +510,7 @@ export function LeadsPageClient() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex h-full flex-col">
-        <PageHeader>
-          <div className="flex flex-1 items-center justify-between">
-            <h1 className="font-semibold text-lg tracking-tight">Leads</h1>
-          </div>
-        </PageHeader>
-        <div className="flex-1 p-4">
-          <div className="space-y-3">
-            <div className="h-8 w-64 animate-pulse rounded-md bg-muted/60" />
-            <div className="space-y-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  className="h-12 w-full animate-pulse rounded-md bg-muted/40"
-                  key={`skel-${
-                    // biome-ignore lint/suspicious/noArrayIndexKey: skeleton
-                    i
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageSkeleton header="Leads" />;
   }
 
   return (
@@ -572,7 +549,7 @@ export function LeadsPageClient() {
         </div>
       </PageHeader>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-5">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <HugeiconsIcon

@@ -4,6 +4,8 @@ import {
   Contact01Icon,
   DashboardBrowsingIcon,
   FilterIcon,
+  PresentationBarChart01Icon,
+  Settings01Icon,
   Task01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -27,6 +29,8 @@ const NAV_ITEMS = [
   { label: "Leads", href: "/leads", icon: Contact01Icon },
   { label: "Pipeline", href: "/pipeline", icon: FilterIcon },
   { label: "Tasks", href: "/tasks", icon: Task01Icon },
+  { label: "Reporting", href: "/reporting", icon: PresentationBarChart01Icon },
+  { label: "Settings", href: "/settings", icon: Settings01Icon },
 ];
 
 export function CommandMenu() {
