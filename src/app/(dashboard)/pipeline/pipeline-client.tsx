@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Pill, UserAvatar } from "@/components/micro";
 import { PageHeader } from "@/components/page-header";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LEAD_STATUSES, STATUS_COLORS, STATUS_LABELS } from "@/lib/constants";
+import { EmptyState } from "@/components/page-skeleton";
+import {
+  LEAD_STATUSES,
+  STATUS_DOT_COLORS,
+  STATUS_LABELS,
+} from "@/lib/constants";
 import dayjs from "@/lib/dayjs";
 import { useChangeLeadStatus, useLeads } from "@/lib/queries";
-import { formatCents, getInitials } from "@/lib/utils";
+import { formatCents } from "@/lib/utils";
 
 export function PipelineClient() {
   const { data: leads = [], isLoading } = useLeads();
@@ -46,7 +51,32 @@ export function PipelineClient() {
   }
 
   if (isLoading) {
-    return null;
+    return (
+      <div className="flex h-full flex-col">
+        <PageHeader>
+          <h1 className="font-semibold text-lg tracking-tight">Pipeline</h1>
+        </PageHeader>
+        <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              className="w-72 shrink-0 animate-pulse rounded-sm border bg-card/50"
+              key={`skel-${
+                // biome-ignore lint/suspicious/noArrayIndexKey: skeleton
+                i
+              }`}
+            >
+              <div className="border-b px-3 py-2.5">
+                <div className="h-4 w-20 rounded bg-muted/60" />
+              </div>
+              <div className="space-y-2 p-2">
+                <div className="h-16 rounded-md bg-muted/40" />
+                <div className="h-16 rounded-md bg-muted/40" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const isDragging = !!draggedLeadId;
@@ -80,21 +110,15 @@ export function PipelineClient() {
               <div className="flex items-center justify-between border-b px-3 py-2.5">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`size-2 rounded-full ${STATUS_COLORS[col.status].split(" ")[0]}`}
+                    className={`size-2 rounded-full ${STATUS_DOT_COLORS[col.status]}`}
                   />
                   <span className="font-medium text-xs">{col.label}</span>
                 </div>
-                <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                  {col.leads.length}
-                </span>
+                <Pill>{col.leads.length}</Pill>
               </div>
 
               <div className="flex-1 space-y-1.5 overflow-y-auto p-2">
-                {col.leads.length === 0 && (
-                  <p className="py-8 text-center text-muted-foreground text-xs">
-                    No leads
-                  </p>
-                )}
+                {col.leads.length === 0 && <EmptyState message="No leads" />}
                 {col.leads.map((lead) => (
                   <div
                     className={`cursor-grab rounded-md border bg-background p-3 transition-all hover:border-border hover:bg-muted/30 active:cursor-grabbing ${
@@ -107,11 +131,7 @@ export function PipelineClient() {
                   >
                     <Link className="block" href={`/leads/${lead.id}`}>
                       <div className="flex items-center gap-2">
-                        <Avatar className="size-6">
-                          <AvatarFallback className="bg-muted text-[9px] text-muted-foreground">
-                            {getInitials(lead.name)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar name={lead.name} size="sm" />
                         <span className="truncate font-medium text-sm">
                           {lead.name}
                         </span>
@@ -133,11 +153,7 @@ export function PipelineClient() {
                           {dayjs(lead.createdAt).fromNow()}
                         </span>
                         {lead.assignedUser && (
-                          <Avatar className="size-4">
-                            <AvatarFallback className="bg-muted text-[6px] text-muted-foreground">
-                              {getInitials(lead.assignedUser.name)}
-                            </AvatarFallback>
-                          </Avatar>
+                          <UserAvatar name={lead.assignedUser.name} size="xs" />
                         )}
                       </div>
                     </Link>

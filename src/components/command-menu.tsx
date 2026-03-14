@@ -9,6 +9,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { UserAvatar } from "@/components/micro";
 import {
   Command,
   CommandDialog,
@@ -20,7 +21,6 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { useLeads } from "@/lib/queries";
-import { getInitials } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/", icon: DashboardBrowsingIcon },
@@ -75,9 +75,7 @@ export function CommandMenu() {
                     key={lead.id}
                     onSelect={() => go(`/leads/${lead.id}`)}
                   >
-                    <span className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-muted font-medium text-[8px] text-muted-foreground">
-                      {getInitials(lead.name)}
-                    </span>
+                    <UserAvatar name={lead.name} size="sm" />
                     <span className="flex-1 truncate">{lead.name}</span>
                     {lead.company && (
                       <span className="text-muted-foreground text-xs">

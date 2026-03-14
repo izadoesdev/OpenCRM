@@ -1,14 +1,11 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
-  Cancel01Icon,
-  CheckmarkCircle01Icon,
-  ComputerVideoCallIcon,
+  Add01Icon,
   Delete02Icon,
   Edit02Icon,
-  HelpCircleIcon,
-  Link01Icon,
-  Mail01Icon,
+  RepeatIcon,
   Task01Icon,
   UserIcon,
 } from "@hugeicons/core-free-icons";
@@ -16,15 +13,28 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { useState } from "react";
 import { DateTimePicker } from "@/components/date-time-picker";
+import {
+  MeetingDetail,
+  MeetingLinkBadge,
+  MeetingLinkPill,
+} from "@/components/meeting-detail";
+import {
+  IconSelect,
+  Pill,
+  SectionHeader,
+  UserAvatar,
+} from "@/components/micro";
 import { PageHeader } from "@/components/page-header";
+import { EmptyState, PageSkeleton } from "@/components/page-skeleton";
+import { SegmentedControl } from "@/components/segmented-control";
 import { StatusBadge } from "@/components/status-badge";
 import { TaskCheckbox } from "@/components/task-checkbox";
+import { TaskInlineEdit } from "@/components/task-inline-edit";
 import {
   RecurrenceBadge,
   TaskTypeBadge,
   TaskTypePicker,
 } from "@/components/task-type-picker";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -33,20 +43,23 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/lib/auth-client";
-import { TASK_TYPE_LABELS, TASK_TYPES } from "@/lib/constants";
+import {
+  RECURRENCE_LABELS,
+  TASK_RECURRENCES,
+  TASK_TYPE_LABELS,
+  TASK_TYPES,
+} from "@/lib/constants";
 import dayjs from "@/lib/dayjs";
 import {
-  useAddTaskAttendees,
-  useCalendarEvent,
+  useCreateTask,
   useDeleteTask,
+  useLeads,
   useTasks,
   useTeamMembers,
   useToggleTask,
-  useUpdateTask,
 } from "@/lib/queries";
-import { getInitials } from "@/lib/utils";
+import { getDueLabel, isMeetingType } from "@/lib/utils";
 
 interface TaskUser {
   email: string;
@@ -89,299 +102,6 @@ const TYPE_FILTERS = [
   })),
 ];
 
-function getDueLabel(
-  dueAt: Date,
-  completed: boolean
-): { text: string; className: string } {
-  if (completed) {
-    return { text: "Done", className: "text-muted-foreground" };
-  }
-  const d = dayjs(dueAt);
-  const rel = d.fromNow();
-  if (d.isToday()) {
-    return {
-      text: `Today · ${d.format("h:mm A")} · ${rel}`,
-      className: "text-amber-400",
-    };
-  }
-  if (d.isBefore(dayjs(), "minute")) {
-    return {
-      text: `Overdue · ${d.format("MMM D")} · ${rel}`,
-      className: "text-red-400",
-    };
-  }
-  if (d.isTomorrow()) {
-    return {
-      text: `Tomorrow · ${d.format("h:mm A")} · ${rel}`,
-      className: "text-blue-400",
-    };
-  }
-  return {
-    text: `${d.format("MMM D · h:mm A")} · ${rel}`,
-    className: "text-muted-foreground",
-  };
-}
-
-const RSVP_CONFIG: Record<
-  string,
-  { icon: typeof CheckmarkCircle01Icon; label: string; className: string }
-> = {
-  accepted: {
-    icon: CheckmarkCircle01Icon,
-    label: "Accepted",
-    className: "text-emerald-400",
-  },
-  declined: {
-    icon: Cancel01Icon,
-    label: "Declined",
-    className: "text-red-400",
-  },
-  tentative: {
-    icon: HelpCircleIcon,
-    label: "Maybe",
-    className: "text-amber-400",
-  },
-  needsAction: {
-    icon: Mail01Icon,
-    label: "Pending",
-    className: "text-muted-foreground",
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Meeting detail panel — fetches calendar event data for attendees
-// ---------------------------------------------------------------------------
-function MeetingDetail({
-  calendarEventId,
-  meetingLink,
-  taskId,
-  leadId,
-}: {
-  calendarEventId: string;
-  meetingLink: string | null;
-  taskId: string;
-  leadId: string;
-}) {
-  const { data: event, isLoading } = useCalendarEvent(calendarEventId);
-  const addAttendees = useAddTaskAttendees();
-  const [showInvite, setShowInvite] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-
-  function handleInvite() {
-    if (!inviteEmail.trim()) {
-      return;
-    }
-    addAttendees.mutate(
-      {
-        id: taskId,
-        emails: [inviteEmail.trim()],
-        calendarEventId,
-        leadId,
-      },
-      {
-        onSuccess: () => {
-          setInviteEmail("");
-          setShowInvite(false);
-        },
-      }
-    );
-  }
-
-  const attendees = event?.attendees ?? [];
-
-  return (
-    <div className="space-y-3">
-      {/* Meeting link */}
-      {meetingLink && (
-        <a
-          className="inline-flex items-center gap-2 rounded-md bg-emerald-500/10 px-3 py-1.5 text-emerald-400 text-xs transition-colors hover:bg-emerald-500/20"
-          href={meetingLink}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          <HugeiconsIcon
-            icon={ComputerVideoCallIcon}
-            size={14}
-            strokeWidth={1.5}
-          />
-          Join Meeting
-          <span className="text-emerald-400/60">
-            {meetingLink.includes("meet.google") ? "Google Meet" : ""}
-          </span>
-        </a>
-      )}
-
-      {/* Attendees */}
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <span className="font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
-            Attendees
-            {!isLoading && ` (${attendees.length})`}
-          </span>
-          <button
-            className="text-[11px] text-primary hover:underline"
-            onClick={() => setShowInvite(!showInvite)}
-            type="button"
-          >
-            + Invite
-          </button>
-        </div>
-
-        {isLoading && <p className="text-muted-foreground text-xs">Loading…</p>}
-
-        {!isLoading && attendees.length === 0 && (
-          <p className="text-muted-foreground text-xs">No attendees yet</p>
-        )}
-
-        {attendees.length > 0 && (
-          <div className="space-y-1">
-            {attendees.map((a) => {
-              const rsvp =
-                RSVP_CONFIG[a.responseStatus ?? "needsAction"] ??
-                RSVP_CONFIG.needsAction;
-              const name = a.email.split("@")[0];
-              return (
-                <div
-                  className="flex items-center gap-2 rounded-md px-1 py-0.5"
-                  key={a.email}
-                >
-                  <Avatar className="size-5">
-                    <AvatarFallback className="bg-muted text-[8px]">
-                      {getInitials(name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="min-w-0 flex-1 truncate text-xs">
-                    {a.email}
-                  </span>
-                  <span
-                    className={`flex items-center gap-1 text-[10px] ${rsvp.className}`}
-                  >
-                    <HugeiconsIcon icon={rsvp.icon} size={10} strokeWidth={2} />
-                    {rsvp.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {showInvite && (
-          <div className="mt-2 flex items-center gap-2">
-            <Input
-              autoFocus
-              className="h-7 flex-1 text-xs"
-              onChange={(e) => setInviteEmail(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleInvite();
-                }
-                if (e.key === "Escape") {
-                  setShowInvite(false);
-                }
-              }}
-              placeholder="email@example.com"
-              type="email"
-              value={inviteEmail}
-            />
-            <Button
-              className="h-7 text-xs"
-              disabled={!inviteEmail.trim() || addAttendees.isPending}
-              onClick={handleInvite}
-              size="sm"
-            >
-              {addAttendees.isPending ? "…" : "Send"}
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Inline edit panel (shown when task is expanded and user clicks Edit)
-// ---------------------------------------------------------------------------
-function InlineEditPanel({
-  task: t,
-  onClose,
-}: {
-  task: TaskWithLead;
-  onClose: () => void;
-}) {
-  const updateTask = useUpdateTask();
-  const [title, setTitle] = useState(t.title);
-  const [description, setDescription] = useState(t.description ?? "");
-  const [dueAt, setDueAt] = useState<Date | null>(new Date(t.dueAt));
-  const [type, setType] = useState(t.type);
-
-  function handleSave() {
-    if (!(title.trim() && dueAt)) {
-      return;
-    }
-    updateTask.mutate(
-      {
-        id: t.id,
-        data: {
-          title,
-          description: description || undefined,
-          dueAt,
-          type,
-        },
-        leadId: t.leadId,
-      },
-      { onSuccess: onClose }
-    );
-  }
-
-  return (
-    <div className="space-y-2.5">
-      <Input
-        autoFocus
-        className="text-sm"
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSave();
-          }
-        }}
-        placeholder="Task title"
-        value={title}
-      />
-      <Textarea
-        className="min-h-[60px] text-xs"
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Add a description…"
-        value={description}
-      />
-      <div className="flex items-center gap-2">
-        <TaskTypePicker className="flex-1" onChange={setType} value={type} />
-        <DateTimePicker
-          className="flex-1"
-          onChange={(d) => setDueAt(d)}
-          value={dueAt}
-        />
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button onClick={onClose} size="sm" variant="ghost">
-          Cancel
-        </Button>
-        <Button
-          disabled={!(title.trim() && dueAt) || updateTask.isPending}
-          onClick={handleSave}
-          size="sm"
-        >
-          Save
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Expanded detail panel for a single task
-// ---------------------------------------------------------------------------
 function TaskDetail({
   task: t,
   onDelete,
@@ -390,21 +110,24 @@ function TaskDetail({
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const isMeeting = t.type === "meeting" || t.type === "demo";
 
   if (editing) {
-    return <InlineEditPanel onClose={() => setEditing(false)} task={t} />;
+    return (
+      <TaskInlineEdit
+        leadId={t.leadId}
+        onClose={() => setEditing(false)}
+        task={t}
+      />
+    );
   }
 
   return (
     <div className="space-y-3">
-      {/* Description */}
       {t.description && (
         <p className="text-muted-foreground text-xs">{t.description}</p>
       )}
 
-      {/* Meeting detail */}
-      {isMeeting && t.calendarEventId && (
+      {isMeetingType(t.type) && t.calendarEventId && (
         <MeetingDetail
           calendarEventId={t.calendarEventId}
           leadId={t.leadId}
@@ -413,20 +136,10 @@ function TaskDetail({
         />
       )}
 
-      {/* Non-calendar meeting link */}
-      {isMeeting && !t.calendarEventId && t.meetingLink && (
-        <a
-          className="inline-flex items-center gap-2 rounded-md bg-emerald-500/10 px-3 py-1.5 text-emerald-400 text-xs transition-colors hover:bg-emerald-500/20"
-          href={t.meetingLink}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          <HugeiconsIcon icon={Link01Icon} size={12} strokeWidth={1.5} />
-          {t.meetingLink}
-        </a>
+      {isMeetingType(t.type) && !t.calendarEventId && t.meetingLink && (
+        <MeetingLinkBadge href={t.meetingLink} />
       )}
 
-      {/* Lead info */}
       {t.lead && (
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-muted-foreground">Lead:</span>
@@ -440,20 +153,14 @@ function TaskDetail({
         </div>
       )}
 
-      {/* Assigned to */}
       {t.user && (
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-muted-foreground">Assigned:</span>
-          <Avatar className="size-4">
-            <AvatarFallback className="bg-primary/10 text-[7px] text-primary">
-              {getInitials(t.user.name)}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar name={t.user.name} size="xs" />
           <span className="text-xs">{t.user.name}</span>
         </div>
       )}
 
-      {/* Actions */}
       <div className="flex items-center gap-2 border-t pt-2">
         <Button onClick={() => setEditing(true)} size="sm" variant="outline">
           <HugeiconsIcon icon={Edit02Icon} size={12} strokeWidth={1.5} />
@@ -493,8 +200,7 @@ function TaskRow({
 }) {
   const isComplete = !!t.completedAt;
   const due = getDueLabel(new Date(t.dueAt), isComplete);
-  const isMeeting = t.type === "meeting" || t.type === "demo";
-  const showJoin = isMeeting && t.meetingLink && !expanded;
+  const showJoin = isMeetingType(t.type) && t.meetingLink && !expanded;
 
   return (
     <div
@@ -519,20 +225,10 @@ function TaskRow({
               {t.title}
             </span>
             {showJoin && (
-              <a
-                className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400 transition-colors hover:bg-emerald-500/20"
+              <MeetingLinkPill
                 href={t.meetingLink ?? ""}
                 onClick={(e) => e.stopPropagation()}
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                <HugeiconsIcon
-                  icon={ComputerVideoCallIcon}
-                  size={10}
-                  strokeWidth={2}
-                />
-                Join
-              </a>
+              />
             )}
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -553,11 +249,7 @@ function TaskRow({
 
         {showAssignee && t.user && (
           <span className="flex shrink-0 items-center gap-1.5 pt-1">
-            <Avatar className="size-5">
-              <AvatarFallback className="bg-primary/10 text-[7px] text-primary">
-                {getInitials(t.user.name)}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar name={t.user.name} size="sm" />
           </span>
         )}
       </button>
@@ -571,9 +263,156 @@ function TaskRow({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main page
-// ---------------------------------------------------------------------------
+function AddTaskForm({
+  teamMembers,
+  onClose,
+}: {
+  teamMembers: Array<{ id: string; name: string; email: string }>;
+  onClose: () => void;
+}) {
+  const { data: leads = [] } = useLeads();
+  const createTask = useCreateTask();
+  const [title, setTitle] = useState("");
+  const [leadId, setLeadId] = useState<string>("");
+  const [dueAt, setDueAt] = useState<Date | null>(null);
+  const [type, setType] = useState("follow_up");
+  const [assignee, setAssignee] = useState("_self");
+  const [recurrence, setRecurrence] = useState("none");
+  const [meetingLink, setMeetingLink] = useState("");
+  const [syncCalendar, setSyncCalendar] = useState(true);
+
+  const showMeetingFields = isMeetingType(type);
+
+  function handleSubmit() {
+    if (!(title.trim() && dueAt && leadId)) {
+      return;
+    }
+    createTask.mutate(
+      {
+        leadId,
+        title: title.trim(),
+        dueAt,
+        type,
+        userId: assignee === "_self" ? undefined : assignee,
+        recurrence: recurrence === "none" ? null : recurrence,
+        meetingLink: meetingLink.trim() || null,
+        syncToCalendar: syncCalendar && showMeetingFields,
+      },
+      { onSuccess: onClose }
+    );
+  }
+
+  return (
+    <div className="mx-auto mb-4 max-w-2xl space-y-2.5 rounded-lg border bg-muted/20 p-4">
+      <Input
+        autoFocus
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            handleSubmit();
+          }
+          if (e.key === "Escape") {
+            onClose();
+          }
+        }}
+        placeholder="Task title…"
+        value={title}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <Select onValueChange={(v) => v && setLeadId(v)} value={leadId}>
+          <SelectTrigger className="w-full text-xs">
+            <span className="flex-1 truncate text-left">
+              {leadId
+                ? ((leads as Array<{ id: string; name: string }>).find(
+                    (l) => l.id === leadId
+                  )?.name ?? "Select lead…")
+                : "Select lead…"}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {(leads as Array<{ id: string; name: string }>).map((l) => (
+              <SelectItem key={l.id} value={l.id}>
+                {l.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <TaskTypePicker className="w-full" onChange={setType} value={type} />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <DateTimePicker onChange={setDueAt} value={dueAt} />
+        <IconSelect
+          displayValue={
+            assignee === "_self"
+              ? "Myself"
+              : (teamMembers.find((m) => m.id === assignee)?.name ?? "Select…")
+          }
+          icon={UserIcon}
+          onValueChange={setAssignee}
+          value={assignee}
+        >
+          <SelectItem value="_self">Myself</SelectItem>
+          {teamMembers.map((m) => (
+            <SelectItem key={m.id} value={m.id}>
+              {m.name}
+            </SelectItem>
+          ))}
+        </IconSelect>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <IconSelect
+          displayValue={
+            recurrence === "none"
+              ? "One-time"
+              : (RECURRENCE_LABELS[recurrence] ?? recurrence)
+          }
+          icon={RepeatIcon}
+          onValueChange={setRecurrence}
+          value={recurrence}
+        >
+          <SelectItem value="none">One-time</SelectItem>
+          {TASK_RECURRENCES.map((r) => (
+            <SelectItem key={r} value={r}>
+              {RECURRENCE_LABELS[r]}
+            </SelectItem>
+          ))}
+        </IconSelect>
+        {showMeetingFields && (
+          <Input
+            onChange={(e) => setMeetingLink(e.target.value)}
+            placeholder="Meeting link (optional)"
+            value={meetingLink}
+          />
+        )}
+      </div>
+      {showMeetingFields && (
+        <label className="flex items-center gap-2 text-muted-foreground text-xs">
+          <input
+            checked={syncCalendar}
+            className="rounded border"
+            onChange={(e) => setSyncCalendar(e.target.checked)}
+            type="checkbox"
+          />
+          Create Google Calendar event with Meet link
+        </label>
+      )}
+      <div className="flex justify-end gap-2">
+        <Button onClick={onClose} size="sm" variant="ghost">
+          Cancel
+        </Button>
+        <Button
+          disabled={createTask.isPending || !title.trim() || !dueAt || !leadId}
+          onClick={handleSubmit}
+          size="sm"
+        >
+          Add Task
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function TasksPageClient() {
   const session = useSession();
   const currentUserId = session.data?.user?.id;
@@ -581,6 +420,7 @@ export function TasksPageClient() {
   const [viewMode, setViewMode] = useState<"mine" | "all">("mine");
   const [userFilter, setUserFilter] = useState<string>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showAddTask, setShowAddTask] = useState(false);
 
   let effectiveUserId: string | undefined;
   if (viewMode === "mine") {
@@ -629,7 +469,7 @@ export function TasksPageClient() {
   ).length;
 
   if (isLoading) {
-    return null;
+    return <PageSkeleton header="Tasks" />;
   }
 
   function renderSection(
@@ -642,13 +482,9 @@ export function TasksPageClient() {
     }
     return (
       <div>
-        <h2
-          className={`mb-1.5 flex items-center gap-2 font-medium text-[10px] uppercase tracking-widest ${labelClass ?? "text-muted-foreground"}`}
-        >
+        <SectionHeader className={labelClass} count={items.length} divider>
           {title}
-          <span className="font-mono">{items.length}</span>
-          <span className="h-px flex-1 bg-border" />
-        </h2>
+        </SectionHeader>
         <div className="space-y-0.5">
           {items.map((t) => (
             <TaskRow
@@ -682,81 +518,53 @@ export function TasksPageClient() {
         <div className="flex flex-1 items-center justify-between">
           <div className="flex items-center gap-2.5">
             <h1 className="font-semibold text-lg tracking-tight">Tasks</h1>
-            {openCount > 0 && (
-              <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-muted-foreground text-xs">
-                {openCount}
-              </span>
-            )}
+            {openCount > 0 && <Pill>{openCount}</Pill>}
             {overdueCount > 0 && (
-              <span className="rounded-sm bg-red-500/15 px-1.5 py-0.5 font-mono text-red-400 text-xs">
-                {overdueCount} overdue
-              </span>
+              <Pill variant="danger">{overdueCount} overdue</Pill>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex rounded-md border bg-muted/30 p-0.5">
-              <button
-                className={`rounded-sm px-2.5 py-1 text-xs transition-all ${
-                  viewMode === "mine"
-                    ? "bg-background font-medium shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => {
-                  setViewMode("mine");
+            <SegmentedControl
+              onChange={(v) => {
+                setViewMode(v);
+                if (v === "mine") {
                   setUserFilter("all");
-                }}
-                type="button"
-              >
-                My Tasks
-              </button>
-              <button
-                className={`rounded-sm px-2.5 py-1 text-xs transition-all ${
-                  viewMode === "all"
-                    ? "bg-background font-medium shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => setViewMode("all")}
-                type="button"
-              >
-                All Tasks
-              </button>
-            </div>
+                }
+              }}
+              segments={[
+                { value: "mine" as const, label: "My Tasks" },
+                { value: "all" as const, label: "All Tasks" },
+              ]}
+              value={viewMode}
+            />
 
             {viewMode === "all" && teamMembers.length > 1 && (
-              <Select
-                onValueChange={(v) => v && setUserFilter(v)}
+              <IconSelect
+                className="h-8 w-[140px]"
+                displayValue={
+                  userFilter === "all"
+                    ? "Everyone"
+                    : ((
+                        teamMembers as Array<{ id: string; name: string }>
+                      ).find((m) => m.id === userFilter)?.name ?? "Select…")
+                }
+                icon={UserIcon}
+                onValueChange={setUserFilter}
                 value={userFilter}
               >
-                <SelectTrigger className="h-8 w-[140px] text-xs">
-                  <HugeiconsIcon
-                    className="mr-1 text-muted-foreground"
-                    icon={UserIcon}
-                    size={12}
-                    strokeWidth={1.5}
-                  />
-                  <span className="flex-1 truncate text-left">
-                    {userFilter === "all"
-                      ? "Everyone"
-                      : ((
-                          teamMembers as Array<{ id: string; name: string }>
-                        ).find((m) => m.id === userFilter)?.name ?? "Select…")}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Everyone</SelectItem>
-                  {(
-                    teamMembers as Array<{
-                      id: string;
-                      name: string;
-                      email: string;
-                    }>
-                  ).map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <SelectItem value="all">Everyone</SelectItem>
+                {(
+                  teamMembers as Array<{
+                    id: string;
+                    name: string;
+                    email: string;
+                  }>
+                ).map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </IconSelect>
             )}
 
             <Select
@@ -784,21 +592,34 @@ export function TasksPageClient() {
             >
               {showCompleted ? "Hide Done" : "Show Done"}
             </Button>
+            <Button onClick={() => setShowAddTask(!showAddTask)} size="sm">
+              <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+              Add Task
+            </Button>
           </div>
         </div>
       </PageHeader>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {tasks.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-            <HugeiconsIcon
-              className="mb-3 opacity-40"
-              icon={Task01Icon}
-              size={36}
-              strokeWidth={1}
-            />
-            <p className="text-sm">{emptyMessage(typeFilter, showCompleted)}</p>
-          </div>
+        {showAddTask && (
+          <AddTaskForm
+            onClose={() => setShowAddTask(false)}
+            teamMembers={
+              teamMembers as Array<{
+                id: string;
+                name: string;
+                email: string;
+              }>
+            }
+          />
+        )}
+
+        {tasks.length === 0 && !showAddTask && (
+          <EmptyState
+            className="py-20"
+            icon={<HugeiconsIcon icon={Task01Icon} size={36} strokeWidth={1} />}
+            message={emptyMessage(typeFilter, showCompleted)}
+          />
         )}
 
         <div className="mx-auto max-w-2xl space-y-6">

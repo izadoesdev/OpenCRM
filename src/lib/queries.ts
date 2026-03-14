@@ -36,7 +36,7 @@ import {
   updateTask,
 } from "@/lib/actions/tasks";
 import { getTeamMembers } from "@/lib/actions/team";
-import { RESCHEDULE_LABELS, STATUS_LABELS } from "@/lib/constants";
+import { STATUS_LABELS } from "@/lib/constants";
 import {
   getCalendarEvent,
   getUpcomingCalendarEvents,
@@ -485,7 +485,7 @@ export function useRescheduleTask() {
     }) => rescheduleTask(id, days),
     onSuccess: (_, { days, leadId }) => {
       inv.tasks(leadId);
-      toast(`Rescheduled ${RESCHEDULE_LABELS[days] ?? `+${days}d`}`);
+      toast(`Rescheduled +${days} day${days === 1 ? "" : "s"}`);
     },
     onError: () => toast.error("Failed to reschedule task"),
   });

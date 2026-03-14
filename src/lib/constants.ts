@@ -87,10 +87,26 @@ export const TASK_TYPE_COLORS: Record<string, string> = {
   other: "bg-zinc-500/15 text-zinc-400",
 };
 
-export const RESCHEDULE_LABELS: Record<number, string> = {
-  1: "tomorrow",
-  3: "in 3 days",
-  7: "in 1 week",
+export const STATUS_DOT_COLORS: Record<string, string> = {
+  new: "bg-blue-500",
+  contacted: "bg-violet-500",
+  interested: "bg-amber-500",
+  demo: "bg-cyan-500",
+  negotiating: "bg-orange-500",
+  converted: "bg-emerald-500",
+  lost: "bg-red-500",
+  churned: "bg-zinc-500",
+};
+
+export const STATUS_TEXT_COLORS: Record<string, string> = {
+  new: "text-blue-400",
+  contacted: "text-violet-400",
+  interested: "text-amber-400",
+  demo: "text-cyan-400",
+  negotiating: "text-orange-400",
+  converted: "text-emerald-400",
+  lost: "text-red-400",
+  churned: "text-zinc-400",
 };
 
 export const TASK_RECURRENCES = [

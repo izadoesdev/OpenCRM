@@ -35,3 +35,40 @@ export function formatWebsite(url: string): string {
 export function defaultDueDate(): string {
   return dayjs().add(1, "day").format("YYYY-MM-DDTHH:mm");
 }
+
+export function getDueLabel(
+  dueAt: Date,
+  completed: boolean
+): { text: string; className: string } {
+  if (completed) {
+    return { text: "Done", className: "text-muted-foreground" };
+  }
+  const d = dayjs(dueAt);
+  const rel = d.fromNow();
+  if (d.isToday()) {
+    return {
+      text: `Today · ${d.format("h:mm A")} · ${rel}`,
+      className: "text-amber-400",
+    };
+  }
+  if (d.isBefore(dayjs(), "minute")) {
+    return {
+      text: `Overdue · ${d.format("MMM D")} · ${rel}`,
+      className: "text-red-400",
+    };
+  }
+  if (d.isTomorrow()) {
+    return {
+      text: `Tomorrow · ${d.format("h:mm A")} · ${rel}`,
+      className: "text-blue-400",
+    };
+  }
+  return {
+    text: `${d.format("MMM D · h:mm A")} · ${rel}`,
+    className: "text-muted-foreground",
+  };
+}
+
+export function isMeetingType(type: string): boolean {
+  return type === "meeting" || type === "demo";
+}

@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  RECURRENCE_LABELS,
   TASK_TYPE_COLORS,
   TASK_TYPE_LABELS,
   TASK_TYPES,
@@ -119,16 +120,10 @@ export function RecurrenceBadge({ recurrence }: { recurrence: string | null }) {
   if (!recurrence) {
     return null;
   }
-  const labels: Record<string, string> = {
-    daily: "Daily",
-    weekly: "Weekly",
-    biweekly: "Biweekly",
-    monthly: "Monthly",
-  };
   return (
     <span className="inline-flex items-center gap-0.5 rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[9px] text-violet-400 uppercase">
       <HugeiconsIcon icon={RepeatIcon} size={8} strokeWidth={2} />
-      {labels[recurrence] ?? recurrence}
+      {RECURRENCE_LABELS[recurrence] ?? recurrence}
     </span>
   );
 }

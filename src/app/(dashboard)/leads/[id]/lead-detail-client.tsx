@@ -4,14 +4,9 @@ import {
   Add01Icon,
   ArrowLeft02Icon,
   CallIcon,
-  Cancel01Icon,
-  CheckmarkCircle01Icon,
-  ComputerVideoCallIcon,
   Delete02Icon,
   Edit02Icon,
   Globe02Icon,
-  HelpCircleIcon,
-  Link01Icon,
   LinkSquare01Icon,
   Mail01Icon,
   MoreHorizontalIcon,
@@ -28,15 +23,29 @@ import { useState } from "react";
 import { DateTimePicker } from "@/components/date-time-picker";
 import { EmailComposeDialog } from "@/components/email-compose-dialog";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
+import {
+  MeetingDetail,
+  MeetingLinkBadge,
+  MeetingLinkPill,
+} from "@/components/meeting-detail";
+import {
+  DetailField,
+  IconSelect,
+  Pill,
+  SectionHeader,
+  UserAvatar,
+} from "@/components/micro";
 import { PageHeader } from "@/components/page-header";
+import { EmptyState, PageSkeleton } from "@/components/page-skeleton";
+import { SegmentedControl } from "@/components/segmented-control";
 import { StatusBadge, StatusDot } from "@/components/status-badge";
 import { TaskCheckbox } from "@/components/task-checkbox";
+import { TaskInlineEdit } from "@/components/task-inline-edit";
 import {
   RecurrenceBadge,
   TaskTypeBadge,
   TaskTypePicker,
 } from "@/components/task-type-picker";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -53,12 +62,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
+import { SelectItem } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   LEAD_PLANS,
@@ -71,9 +75,7 @@ import {
 import dayjs from "@/lib/dayjs";
 import {
   useAddNote,
-  useAddTaskAttendees,
   useAssignLead,
-  useCalendarEvent,
   useChangeLeadStatus,
   useCreateTask,
   useDeleteLead,
@@ -85,9 +87,8 @@ import {
   useLogOutreach,
   useTeamMembers,
   useToggleTask,
-  useUpdateTask,
 } from "@/lib/queries";
-import { formatCents, formatWebsite, getInitials } from "@/lib/utils";
+import { formatCents, formatWebsite, isMeetingType } from "@/lib/utils";
 
 interface TeamMember {
   email: string;
@@ -105,7 +106,6 @@ const ACTIVITY_ICONS: Record<string, typeof Mail01Icon> = {
   status_change: Task01Icon,
 };
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: lead detail has many UI sections
 export function LeadDetailClient({ leadId }: { leadId: string }) {
   const router = useRouter();
   const { data: lead, isLoading, isError } = useLead(leadId);
@@ -127,7 +127,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
   const [showPlanPicker, setShowPlanPicker] = useState(false);
 
   if (isLoading) {
-    return null;
+    return <PageSkeleton />;
   }
 
   if (isError || !lead) {
@@ -279,11 +279,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
           {/* Profile strip */}
           <div className="shrink-0 border-b px-6 py-4">
             <div className="flex items-center gap-4">
-              <Avatar className="size-11">
-                <AvatarFallback className="bg-muted font-medium text-base text-muted-foreground">
-                  {getInitials(lead.name)}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar name={lead.name} size="xl" />
               <div className="min-w-0">
                 <div className="flex items-center gap-2.5">
                   <h1 className="truncate font-semibold text-lg tracking-tight">
@@ -327,32 +323,25 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
             </div>
           </div>
 
-          {/* Tab switcher */}
-          <div className="flex shrink-0 items-center gap-1 border-b px-6">
-            <button
-              className={`border-b-2 px-3 py-2 text-xs transition-colors ${
-                leftTab === "activity"
-                  ? "border-primary font-medium text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-              onClick={() => setLeftTab("activity")}
-              type="button"
-            >
-              Activity ({lead.activities.length})
-            </button>
-            {gConn?.hasGmail && (
-              <button
-                className={`border-b-2 px-3 py-2 text-xs transition-colors ${
-                  leftTab === "emails"
-                    ? "border-primary font-medium text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => setLeftTab("emails")}
-                type="button"
-              >
-                Emails ({leadEmails.length})
-              </button>
-            )}
+          <div className="flex shrink-0 items-center gap-2 border-b px-6 py-2">
+            <SegmentedControl
+              onChange={setLeftTab}
+              segments={[
+                {
+                  value: "activity" as const,
+                  label: `Activity (${lead.activities.length})`,
+                },
+                ...(gConn?.hasGmail
+                  ? [
+                      {
+                        value: "emails" as const,
+                        label: `Emails (${leadEmails.length})`,
+                      },
+                    ]
+                  : []),
+              ]}
+              value={leftTab}
+            />
           </div>
 
           {/* Scrollable content */}
@@ -360,9 +349,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
             {leftTab === "activity" && (
               <>
                 {lead.activities.length === 0 && (
-                  <p className="py-8 text-center text-muted-foreground text-xs">
-                    No activity yet
-                  </p>
+                  <EmptyState message="No activity yet" />
                 )}
                 <div className="space-y-0">
                   {lead.activities.map((a, i) => {
@@ -399,9 +386,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
             {leftTab === "emails" && (
               <>
                 {leadEmails.length === 0 && (
-                  <p className="py-8 text-center text-muted-foreground text-xs">
-                    No emails found
-                  </p>
+                  <EmptyState message="No emails found" />
                 )}
                 <div className="space-y-2">
                   {leadEmails.map((email) => (
@@ -436,9 +421,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
         <div className="flex w-80 shrink-0 flex-col lg:w-96">
           {/* Details section */}
           <div className="shrink-0 border-b px-5 py-4">
-            <h3 className="mb-2.5 font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
-              Details
-            </h3>
+            <SectionHeader>Details</SectionHeader>
             <div className="space-y-2">
               <DetailRow href={`mailto:${lead.email}`} icon={Mail01Icon}>
                 {lead.email}
@@ -461,46 +444,35 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                   {formatWebsite(lead.website)}
                 </DetailRow>
               )}
-              <div className="flex items-center gap-3 text-sm">
-                <span className="w-16 shrink-0 text-muted-foreground text-xs">
-                  Source
-                </span>
-                <span>{SOURCE_LABELS[lead.source] ?? lead.source}</span>
-              </div>
+              <DetailField label="Source">
+                {SOURCE_LABELS[lead.source] ?? lead.source}
+              </DetailField>
               {lead.value > 0 && (
-                <div className="flex items-center gap-3 text-sm">
-                  <span className="w-16 shrink-0 text-muted-foreground text-xs">
-                    Value
-                  </span>
+                <DetailField label="Value">
                   <span className="font-mono">{formatCents(lead.value)}</span>
-                </div>
+                </DetailField>
               )}
               {lead.plan && (
-                <div className="flex items-center gap-3 text-sm">
-                  <span className="w-16 shrink-0 text-muted-foreground text-xs">
-                    Plan
-                  </span>
-                  <span className="rounded-sm bg-emerald-500/15 px-1.5 py-0.5 font-medium text-[10px] text-emerald-400 uppercase tracking-wider">
+                <DetailField label="Plan">
+                  <Pill
+                    className="font-medium uppercase tracking-wider"
+                    variant="success"
+                  >
                     {lead.plan}
-                  </span>
-                </div>
+                  </Pill>
+                </DetailField>
               )}
-              <div className="flex items-center gap-3 text-sm">
-                <span className="w-16 shrink-0 text-muted-foreground text-xs">
-                  Added
-                </span>
+              <DetailField label="Added">
                 <span className="text-muted-foreground">
                   {dayjs(lead.createdAt).format("MMM D, YYYY")}
                 </span>
-              </div>
+              </DetailField>
             </div>
           </div>
 
           {/* Assigned To section */}
           <div className="shrink-0 border-b px-5 py-4">
-            <h3 className="mb-2.5 font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
-              Assigned To
-            </h3>
+            <SectionHeader>Assigned To</SectionHeader>
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -512,11 +484,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
               >
                 {lead.assignedUser ? (
                   <>
-                    <Avatar className="size-8">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                        {getInitials(lead.assignedUser.name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar name={lead.assignedUser.name} size="lg" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-sm">
                         {lead.assignedUser.name}
@@ -550,18 +518,12 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
                       assignLead.mutate({ leadId: id, assignedTo: m.id })
                     }
                   >
-                    <Avatar className="size-6">
-                      <AvatarFallback className="bg-muted text-[9px] text-muted-foreground">
-                        {getInitials(m.name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar name={m.name} size="sm" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm">{m.name}</p>
                     </div>
                     {lead.assignedTo === m.id && (
-                      <span className="shrink-0 rounded-sm bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
-                        current
-                      </span>
+                      <Pill variant="primary">current</Pill>
                     )}
                   </DropdownMenuItem>
                 ))}
@@ -695,34 +657,38 @@ function LeadTasksSidebar({
     if (!(newTaskTitle.trim() && newTaskDue)) {
       return;
     }
-    const isMeetingType = newTaskType === "meeting" || newTaskType === "demo";
-    createTask.mutate({
-      leadId,
-      title: newTaskTitle,
-      dueAt: newTaskDue,
-      type: newTaskType,
-      userId: newTaskAssignee === "_self" ? undefined : newTaskAssignee,
-      recurrence: newTaskRecurrence === "none" ? null : newTaskRecurrence,
-      meetingLink: newTaskMeetingLink.trim() || null,
-      syncToCalendar: newTaskSyncCalendar && isMeetingType,
-    });
-    setNewTaskTitle("");
-    setNewTaskDue(null);
-    setNewTaskType("follow_up");
-    setNewTaskAssignee("_self");
-    setNewTaskRecurrence("none");
-    setNewTaskMeetingLink("");
-    setShowAddTask(false);
+    const isMeeting = isMeetingType(newTaskType);
+    createTask.mutate(
+      {
+        leadId,
+        title: newTaskTitle,
+        dueAt: newTaskDue,
+        type: newTaskType,
+        userId: newTaskAssignee === "_self" ? undefined : newTaskAssignee,
+        recurrence: newTaskRecurrence === "none" ? null : newTaskRecurrence,
+        meetingLink: newTaskMeetingLink.trim() || null,
+        syncToCalendar: newTaskSyncCalendar && isMeeting,
+      },
+      {
+        onSuccess: () => {
+          setNewTaskTitle("");
+          setNewTaskDue(null);
+          setNewTaskType("follow_up");
+          setNewTaskAssignee("_self");
+          setNewTaskRecurrence("none");
+          setNewTaskMeetingLink("");
+          setShowAddTask(false);
+        },
+      }
+    );
   }
 
-  const showMeetingFields = newTaskType === "meeting" || newTaskType === "demo";
+  const showMeetingFields = isMeetingType(newTaskType);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center justify-between px-5 pt-4 pb-2">
-        <h3 className="font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
-          Tasks ({openTasks.length} open)
-        </h3>
+        <SectionHeader count={openTasks.length}>Tasks</SectionHeader>
         <Button
           onClick={() => {
             setShowAddTask(!showAddTask);
@@ -760,60 +726,41 @@ function LeadTasksSidebar({
             <DateTimePicker onChange={setNewTaskDue} value={newTaskDue} />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Select
-              onValueChange={(v) => v && setNewTaskAssignee(v)}
+            <IconSelect
+              displayValue={
+                newTaskAssignee === "_self"
+                  ? "Myself"
+                  : (teamMembers.find((m) => m.id === newTaskAssignee)?.name ??
+                    "Select...")
+              }
+              icon={UserIcon}
+              onValueChange={setNewTaskAssignee}
               value={newTaskAssignee}
             >
-              <SelectTrigger className="w-full text-xs">
-                <HugeiconsIcon
-                  className="mr-1 shrink-0 text-muted-foreground"
-                  icon={UserIcon}
-                  size={12}
-                  strokeWidth={1.5}
-                />
-                <span className="flex-1 truncate text-left">
-                  {newTaskAssignee === "_self"
-                    ? "Myself"
-                    : (teamMembers.find((m) => m.id === newTaskAssignee)
-                        ?.name ?? "Select...")}
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_self">Myself</SelectItem>
-                {teamMembers.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              onValueChange={(v) => v && setNewTaskRecurrence(v)}
+              <SelectItem value="_self">Myself</SelectItem>
+              {teamMembers.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.name}
+                </SelectItem>
+              ))}
+            </IconSelect>
+            <IconSelect
+              displayValue={
+                newTaskRecurrence === "none"
+                  ? "One-time"
+                  : (RECURRENCE_LABELS[newTaskRecurrence] ?? newTaskRecurrence)
+              }
+              icon={RepeatIcon}
+              onValueChange={setNewTaskRecurrence}
               value={newTaskRecurrence}
             >
-              <SelectTrigger className="w-full text-xs">
-                <HugeiconsIcon
-                  className="mr-1 shrink-0 text-muted-foreground"
-                  icon={RepeatIcon}
-                  size={12}
-                  strokeWidth={1.5}
-                />
-                <span className="flex-1 truncate text-left">
-                  {newTaskRecurrence === "none"
-                    ? "One-time"
-                    : (RECURRENCE_LABELS[newTaskRecurrence] ??
-                      newTaskRecurrence)}
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">One-time</SelectItem>
-                {TASK_RECURRENCES.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {RECURRENCE_LABELS[r]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <SelectItem value="none">One-time</SelectItem>
+              {TASK_RECURRENCES.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {RECURRENCE_LABELS[r]}
+                </SelectItem>
+              ))}
+            </IconSelect>
           </div>
           {showMeetingFields && (
             <>
@@ -903,268 +850,6 @@ function LeadTasksSidebar({
   );
 }
 
-// ---------------------------------------------------------------------------
-// RSVP status config for attendees
-// ---------------------------------------------------------------------------
-const RSVP_CONFIG: Record<
-  string,
-  { icon: typeof CheckmarkCircle01Icon; label: string; className: string }
-> = {
-  accepted: {
-    icon: CheckmarkCircle01Icon,
-    label: "Accepted",
-    className: "text-emerald-400",
-  },
-  declined: {
-    icon: Cancel01Icon,
-    label: "Declined",
-    className: "text-red-400",
-  },
-  tentative: {
-    icon: HelpCircleIcon,
-    label: "Maybe",
-    className: "text-amber-400",
-  },
-  needsAction: {
-    icon: Mail01Icon,
-    label: "Pending",
-    className: "text-muted-foreground",
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Meeting detail for lead task — shows attendees + RSVP + invite
-// ---------------------------------------------------------------------------
-function LeadMeetingDetail({
-  calendarEventId,
-  meetingLink,
-  taskId,
-  leadId,
-}: {
-  calendarEventId: string;
-  meetingLink: string | null;
-  taskId: string;
-  leadId: string;
-}) {
-  const { data: event, isLoading } = useCalendarEvent(calendarEventId);
-  const addAttendees = useAddTaskAttendees();
-  const [showInvite, setShowInvite] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-
-  function handleInvite() {
-    if (!inviteEmail.trim()) {
-      return;
-    }
-    addAttendees.mutate(
-      {
-        id: taskId,
-        emails: [inviteEmail.trim()],
-        calendarEventId,
-        leadId,
-      },
-      {
-        onSuccess: () => {
-          setInviteEmail("");
-          setShowInvite(false);
-        },
-      }
-    );
-  }
-
-  const attendees = event?.attendees ?? [];
-
-  return (
-    <div className="space-y-2">
-      {meetingLink && (
-        <a
-          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2.5 py-1 text-emerald-400 text-xs transition-colors hover:bg-emerald-500/20"
-          href={meetingLink}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          <HugeiconsIcon
-            icon={ComputerVideoCallIcon}
-            size={12}
-            strokeWidth={1.5}
-          />
-          Join Meeting
-        </a>
-      )}
-
-      <div>
-        <div className="mb-1.5 flex items-center justify-between">
-          <span className="font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
-            Attendees{!isLoading && ` (${attendees.length})`}
-          </span>
-          <button
-            className="text-[11px] text-primary hover:underline"
-            onClick={() => setShowInvite(!showInvite)}
-            type="button"
-          >
-            + Invite
-          </button>
-        </div>
-
-        {isLoading && <p className="text-muted-foreground text-xs">Loading…</p>}
-        {!isLoading && attendees.length === 0 && (
-          <p className="text-muted-foreground text-xs">No attendees yet</p>
-        )}
-        {attendees.length > 0 && (
-          <div className="space-y-0.5">
-            {attendees.map((a) => {
-              const rsvp =
-                RSVP_CONFIG[a.responseStatus ?? "needsAction"] ??
-                RSVP_CONFIG.needsAction;
-              return (
-                <div
-                  className="flex items-center gap-2 rounded-md px-1 py-0.5"
-                  key={a.email}
-                >
-                  <Avatar className="size-4">
-                    <AvatarFallback className="bg-muted text-[7px]">
-                      {getInitials(a.email.split("@")[0])}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="min-w-0 flex-1 truncate text-[11px]">
-                    {a.email}
-                  </span>
-                  <span
-                    className={`flex items-center gap-0.5 text-[9px] ${rsvp.className}`}
-                  >
-                    <HugeiconsIcon icon={rsvp.icon} size={9} strokeWidth={2} />
-                    {rsvp.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {showInvite && (
-          <div className="mt-1.5 flex items-center gap-1.5">
-            <Input
-              autoFocus
-              className="h-7 flex-1 text-xs"
-              onChange={(e) => setInviteEmail(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleInvite();
-                }
-                if (e.key === "Escape") {
-                  setShowInvite(false);
-                }
-              }}
-              placeholder="email@example.com"
-              type="email"
-              value={inviteEmail}
-            />
-            <Button
-              className="h-7 text-xs"
-              disabled={!inviteEmail.trim() || addAttendees.isPending}
-              onClick={handleInvite}
-              size="sm"
-            >
-              {addAttendees.isPending ? "…" : "Send"}
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Inline edit for lead task
-// ---------------------------------------------------------------------------
-function LeadTaskInlineEdit({
-  task: t,
-  leadId,
-  onClose,
-}: {
-  task: {
-    id: string;
-    title: string;
-    description: string | null;
-    dueAt: Date;
-    type: string;
-  };
-  leadId: string;
-  onClose: () => void;
-}) {
-  const updateTask = useUpdateTask();
-  const [title, setTitle] = useState(t.title);
-  const [description, setDescription] = useState(t.description ?? "");
-  const [dueAt, setDueAt] = useState<Date | null>(new Date(t.dueAt));
-  const [type, setType] = useState(t.type);
-
-  function handleSave() {
-    if (!(title.trim() && dueAt)) {
-      return;
-    }
-    updateTask.mutate(
-      {
-        id: t.id,
-        data: {
-          title,
-          description: description || undefined,
-          dueAt,
-          type,
-        },
-        leadId,
-      },
-      { onSuccess: onClose }
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      <Input
-        autoFocus
-        className="text-sm"
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSave();
-          }
-        }}
-        placeholder="Task title"
-        value={title}
-      />
-      <Textarea
-        className="min-h-[48px] text-xs"
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Description…"
-        value={description}
-      />
-      <div className="flex items-center gap-2">
-        <TaskTypePicker className="flex-1" onChange={setType} value={type} />
-        <DateTimePicker
-          className="flex-1"
-          onChange={(d) => setDueAt(d)}
-          value={dueAt}
-        />
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button onClick={onClose} size="sm" variant="ghost">
-          Cancel
-        </Button>
-        <Button
-          disabled={!(title.trim() && dueAt) || updateTask.isPending}
-          onClick={handleSave}
-          size="sm"
-        >
-          Save
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Expanded detail for lead task
-// ---------------------------------------------------------------------------
 function LeadTaskDetail({
   task: t,
   leadId,
@@ -1184,11 +869,10 @@ function LeadTaskDetail({
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const isMeeting = t.type === "meeting" || t.type === "demo";
 
   if (editing) {
     return (
-      <LeadTaskInlineEdit
+      <TaskInlineEdit
         leadId={leadId}
         onClose={() => setEditing(false)}
         task={t}
@@ -1202,8 +886,8 @@ function LeadTaskDetail({
         <p className="text-muted-foreground text-xs">{t.description}</p>
       )}
 
-      {isMeeting && t.calendarEventId && (
-        <LeadMeetingDetail
+      {isMeetingType(t.type) && t.calendarEventId && (
+        <MeetingDetail
           calendarEventId={t.calendarEventId}
           leadId={leadId}
           meetingLink={t.meetingLink}
@@ -1211,26 +895,14 @@ function LeadTaskDetail({
         />
       )}
 
-      {isMeeting && !t.calendarEventId && t.meetingLink && (
-        <a
-          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2.5 py-1 text-emerald-400 text-xs transition-colors hover:bg-emerald-500/20"
-          href={t.meetingLink}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          <HugeiconsIcon icon={Link01Icon} size={12} strokeWidth={1.5} />
-          {t.meetingLink}
-        </a>
+      {isMeetingType(t.type) && !t.calendarEventId && t.meetingLink && (
+        <MeetingLinkBadge href={t.meetingLink} />
       )}
 
       {t.user && (
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-muted-foreground">Assigned:</span>
-          <Avatar className="size-4">
-            <AvatarFallback className="bg-primary/10 text-[7px] text-primary">
-              {getInitials(t.user.name)}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar name={t.user.name} size="xs" />
           <span className="text-xs">{t.user.name}</span>
         </div>
       )}
@@ -1285,8 +957,7 @@ function LeadTaskRow({
 }) {
   const isComplete = !!t.completedAt;
   const overdue = !isComplete && dayjs(t.dueAt).isBefore(dayjs(), "minute");
-  const isMeeting = t.type === "meeting" || t.type === "demo";
-  const showJoin = isMeeting && t.meetingLink && !expanded;
+  const showJoin = isMeetingType(t.type) && t.meetingLink && !expanded;
 
   return (
     <div
@@ -1314,20 +985,10 @@ function LeadTaskRow({
               {t.title}
             </span>
             {showJoin && (
-              <a
-                className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-400 transition-colors hover:bg-emerald-500/20"
+              <MeetingLinkPill
                 href={t.meetingLink ?? ""}
                 onClick={(e) => e.stopPropagation()}
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                <HugeiconsIcon
-                  icon={ComputerVideoCallIcon}
-                  size={9}
-                  strokeWidth={2}
-                />
-                Join
-              </a>
+              />
             )}
           </span>
           <span className="mt-0.5 flex flex-wrap items-center gap-1">

@@ -9,14 +9,21 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { useState } from "react";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
+import { MeetingLinkPill } from "@/components/meeting-detail";
+import { Pill, SectionHeader, UserAvatar } from "@/components/micro";
 import { PageHeader } from "@/components/page-header";
+import { EmptyState, PageSkeleton } from "@/components/page-skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { TaskCheckbox } from "@/components/task-checkbox";
 import { RecurrenceBadge, TaskTypeBadge } from "@/components/task-type-picker";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import type { CalendarEvent } from "@/lib/actions/calendar";
-import { LEAD_STATUSES, STATUS_COLORS, STATUS_LABELS } from "@/lib/constants";
+import {
+  LEAD_STATUSES,
+  STATUS_DOT_COLORS,
+  STATUS_LABELS,
+  STATUS_TEXT_COLORS,
+} from "@/lib/constants";
 import dayjs from "@/lib/dayjs";
 import {
   useCalendarEvents,
@@ -24,7 +31,7 @@ import {
   useGoogleConnection,
   useToggleTask,
 } from "@/lib/queries";
-import { formatCents, getInitials } from "@/lib/utils";
+import { formatCents, getDueLabel } from "@/lib/utils";
 
 const ACTIVE_STATUSES = LEAD_STATUSES.filter(
   (s) => s !== "converted" && s !== "lost" && s !== "churned"
@@ -40,7 +47,7 @@ export function DashboardClient() {
   const [showForm, setShowForm] = useState(false);
 
   if (isLoading || !data) {
-    return null;
+    return <PageSkeleton header="Dashboard" />;
   }
 
   const { stats, pipelineCounts } = data;
@@ -129,9 +136,9 @@ export function DashboardClient() {
               <h2 className="font-medium text-sm">
                 Your Tasks
                 {overdueTasks.length > 0 && (
-                  <span className="ml-2 rounded-sm bg-red-500/15 px-1.5 py-0.5 font-mono text-[10px] text-red-400">
+                  <Pill className="ml-2" variant="danger">
                     {overdueTasks.length} overdue
-                  </span>
+                  </Pill>
                 )}
               </h2>
               <Button render={<Link href="/tasks" />} size="sm" variant="ghost">
@@ -145,9 +152,7 @@ export function DashboardClient() {
             </div>
 
             {allTasks.length === 0 && (
-              <p className="py-12 text-center text-muted-foreground text-sm">
-                No open tasks — you're all caught up
-              </p>
+              <EmptyState message="No open tasks — you're all caught up" />
             )}
 
             <div className="mt-3 space-y-4">
@@ -209,11 +214,7 @@ export function DashboardClient() {
                           </span>
                         )}
                       </div>
-                      {ev.hangoutLink && (
-                        <span className="shrink-0 rounded-sm bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400">
-                          Meet
-                        </span>
-                      )}
+                      {ev.hangoutLink && <Pill variant="success">Meet</Pill>}
                     </a>
                   ))}
                 </div>
@@ -255,7 +256,7 @@ export function DashboardClient() {
                       </span>
                       <div className="flex-1 rounded-full bg-muted/50">
                         <div
-                          className={`h-1.5 rounded-full transition-all duration-300 ${STATUS_COLORS[status].split(" ")[0]} ${c === 0 ? "opacity-20" : ""}`}
+                          className={`h-1.5 rounded-full transition-all duration-300 ${STATUS_DOT_COLORS[status]} ${c === 0 ? "opacity-20" : ""}`}
                           style={{ width: `${Math.max(pct, 4)}%` }}
                         />
                       </div>
@@ -271,7 +272,7 @@ export function DashboardClient() {
               <div className="mt-3 flex items-center gap-4 border-t pt-3 text-xs">
                 {(["converted", "lost", "churned"] as const).map((s) => (
                   <span className="text-muted-foreground" key={s}>
-                    <span className={STATUS_COLORS[s].split(" ")[1]}>
+                    <span className={STATUS_TEXT_COLORS[s]}>
                       {pipelineCounts[s] ?? 0}
                     </span>{" "}
                     {STATUS_LABELS[s].toLowerCase()}
@@ -299,9 +300,7 @@ export function DashboardClient() {
               </div>
               <div className="mt-3 space-y-0.5">
                 {recentLeads.length === 0 && (
-                  <p className="py-6 text-center text-muted-foreground text-xs">
-                    No leads yet
-                  </p>
+                  <EmptyState className="py-6" message="No leads yet" />
                 )}
                 {recentLeads.map((lead) => (
                   <Link
@@ -309,11 +308,7 @@ export function DashboardClient() {
                     href={`/leads/${lead.id}`}
                     key={lead.id}
                   >
-                    <Avatar className="size-7">
-                      <AvatarFallback className="bg-muted text-[9px] text-muted-foreground">
-                        {getInitials(lead.name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar name={lead.name} size="md" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm">{lead.name}</p>
                       <p className="truncate text-[11px] text-muted-foreground">
@@ -322,11 +317,7 @@ export function DashboardClient() {
                     </div>
                     <StatusBadge status={lead.status} />
                     {lead.assignedUser && (
-                      <Avatar className="size-4">
-                        <AvatarFallback className="bg-muted text-[6px] text-muted-foreground">
-                          {getInitials(lead.assignedUser.name)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar name={lead.assignedUser.name} size="xs" />
                     )}
                     {lead.value > 0 && (
                       <span className="font-mono text-muted-foreground text-xs">
@@ -376,11 +367,9 @@ function TaskSection({
   }
   return (
     <div>
-      <p
-        className={`mb-1 font-medium text-[10px] uppercase tracking-wider ${labelClass ?? "text-muted-foreground"}`}
-      >
-        {label} ({tasks.length})
-      </p>
+      <SectionHeader className={labelClass} count={tasks.length}>
+        {label}
+      </SectionHeader>
       <div className="space-y-0.5">
         {tasks.map((t) => (
           <DashboardTaskRow key={t.id} onToggle={onToggle} task={t} />
@@ -397,8 +386,8 @@ function DashboardTaskRow({
   task: TaskItem;
   onToggle: ReturnType<typeof useToggleTask>;
 }) {
-  const overdue =
-    dayjs(t.dueAt).isBefore(dayjs(), "minute") && !dayjs(t.dueAt).isToday();
+  const isComplete = !!t.completedAt;
+  const due = getDueLabel(new Date(t.dueAt), isComplete);
 
   return (
     <Link
@@ -408,37 +397,32 @@ function DashboardTaskRow({
       {/* biome-ignore lint/a11y: checkbox handles its own a11y */}
       <span onClick={(e) => e.stopPropagation()}>
         <TaskCheckbox
-          checked={false}
+          checked={isComplete}
           onChange={() =>
-            onToggle.mutate({ id: t.id, isComplete: false, leadId: t.leadId })
+            onToggle.mutate({ id: t.id, isComplete, leadId: t.leadId })
           }
         />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm leading-tight">{t.title}</p>
+        <p
+          className={`text-sm leading-tight ${isComplete ? "text-muted-foreground line-through" : ""}`}
+        >
+          {t.title}
+        </p>
         <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
           {t.lead && (
             <span className="text-muted-foreground text-xs">{t.lead.name}</span>
           )}
           <TaskTypeBadge type={t.type} />
           <RecurrenceBadge recurrence={t.recurrence} />
-          <span
-            className={`text-[11px] ${overdue ? "text-red-400" : "text-muted-foreground"}`}
-          >
-            {dayjs(t.dueAt).format("h:mm A")} · {dayjs(t.dueAt).fromNow()}
-          </span>
+          <span className={`text-[11px] ${due.className}`}>{due.text}</span>
         </div>
       </div>
       {t.meetingLink && (
-        <a
-          className="shrink-0 rounded-sm bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400 transition-colors hover:bg-emerald-500/20"
+        <MeetingLinkPill
           href={t.meetingLink}
           onClick={(e) => e.stopPropagation()}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          Join
-        </a>
+        />
       )}
     </Link>
   );

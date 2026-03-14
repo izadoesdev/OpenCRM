@@ -1,4 +1,8 @@
-import { STATUS_COLORS, STATUS_LABELS } from "@/lib/constants";
+import {
+  STATUS_COLORS,
+  STATUS_DOT_COLORS,
+  STATUS_LABELS,
+} from "@/lib/constants";
 
 export function StatusBadge({ status }: { status: string }) {
   return (
@@ -13,7 +17,7 @@ export function StatusBadge({ status }: { status: string }) {
 export function StatusDot({ status }: { status: string }) {
   return (
     <span
-      className={`inline-block size-2 rounded-full ${STATUS_COLORS[status].split(" ")[0]}`}
+      className={`inline-block size-2 rounded-full ${STATUS_DOT_COLORS[status]}`}
     />
   );
 }

@@ -103,11 +103,15 @@ export async function updateCalendarEvent(
     startTime?: Date;
     endTime?: Date;
     attendeeEmails?: string[];
-  },
+  }
 ): Promise<CalendarEvent> {
   const body: Record<string, unknown> = {};
-  if (data.summary) body.summary = data.summary;
-  if (data.description !== undefined) body.description = data.description;
+  if (data.summary) {
+    body.summary = data.summary;
+  }
+  if (data.description !== undefined) {
+    body.description = data.description;
+  }
   if (data.startTime) {
     body.start = { dateTime: data.startTime.toISOString() };
     body.end = {
@@ -122,18 +126,16 @@ export async function updateCalendarEvent(
 
   return googleFetch<CalendarEvent>(
     `${CAL_BASE}/calendars/primary/events/${eventId}`,
-    { method: "PATCH", body: JSON.stringify(body) },
+    { method: "PATCH", body: JSON.stringify(body) }
   );
 }
 
 export async function addCalendarAttendees(
   eventId: string,
-  newEmails: string[],
+  newEmails: string[]
 ): Promise<CalendarEvent> {
   const existing = await getCalendarEvent(eventId);
-  const currentEmails = new Set(
-    existing.attendees?.map((a) => a.email) ?? [],
-  );
+  const currentEmails = new Set(existing.attendees?.map((a) => a.email) ?? []);
   const allAttendees = [
     ...(existing.attendees ?? []),
     ...newEmails
@@ -146,7 +148,7 @@ export async function addCalendarAttendees(
     {
       method: "PATCH",
       body: JSON.stringify({ attendees: allAttendees }),
-    },
+    }
   );
 }
 

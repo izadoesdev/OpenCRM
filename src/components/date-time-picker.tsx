@@ -3,6 +3,7 @@
 import { Calendar01Icon, Clock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
+import { SectionHeader } from "@/components/micro";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -122,9 +123,9 @@ export function DateTimePicker({
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-0">
         <div className="border-b p-2">
-          <p className="mb-1.5 px-1 font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
+          <SectionHeader className="px-1 text-muted-foreground">
             Date
-          </p>
+          </SectionHeader>
           <div className="space-y-0.5">
             {QUICK_DATES.map((qd) => {
               const d = qd.fn();
@@ -152,9 +153,9 @@ export function DateTimePicker({
           </div>
         </div>
         <div className="p-2">
-          <p className="mb-1.5 px-1 font-medium text-[10px] text-muted-foreground uppercase tracking-widest">
+          <SectionHeader className="px-1 text-muted-foreground">
             Time
-          </p>
+          </SectionHeader>
           <div className="mb-2 flex items-center gap-1.5 px-1">
             <HugeiconsIcon
               className="shrink-0 text-muted-foreground"

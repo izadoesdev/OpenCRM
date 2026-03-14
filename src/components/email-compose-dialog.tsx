@@ -1,8 +1,7 @@
 "use client";
 
-import { Mail01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
+import { SegmentedControl } from "@/components/segmented-control";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -176,36 +175,14 @@ export function EmailComposeDialog({
 
           <DialogFooter className="flex items-center gap-2 sm:justify-between">
             {gConn?.hasGmail && (
-              <div className="flex rounded-md border bg-muted/30 p-0.5">
-                <button
-                  className={`rounded-sm px-2.5 py-1 text-xs transition-all ${
-                    sendVia === "gmail"
-                      ? "bg-background font-medium shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                  onClick={() => setSendVia("gmail")}
-                  type="button"
-                >
-                  <HugeiconsIcon
-                    className="mr-1 inline"
-                    icon={Mail01Icon}
-                    size={11}
-                    strokeWidth={1.5}
-                  />
-                  Gmail
-                </button>
-                <button
-                  className={`rounded-sm px-2.5 py-1 text-xs transition-all ${
-                    sendVia === "resend"
-                      ? "bg-background font-medium shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                  onClick={() => setSendVia("resend")}
-                  type="button"
-                >
-                  Resend
-                </button>
-              </div>
+              <SegmentedControl
+                onChange={setSendVia}
+                segments={[
+                  { value: "gmail" as const, label: "Gmail" },
+                  { value: "resend" as const, label: "Resend" },
+                ]}
+                value={sendVia}
+              />
             )}
             <Button disabled={sendEmail.isPending} type="submit">
               {sendEmail.isPending && "Sending..."}

@@ -11,9 +11,9 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
+import { UserAvatar } from "@/components/micro";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge, StatusDot } from "@/components/status-badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -42,7 +42,7 @@ import {
   useLeadCounts,
   useLeads,
 } from "@/lib/queries";
-import { formatCents, getInitials } from "@/lib/utils";
+import { formatCents } from "@/lib/utils";
 
 export function LeadsPageClient() {
   const router = useRouter();
@@ -93,7 +93,31 @@ export function LeadsPageClient() {
   }
 
   if (isLoading) {
-    return null;
+    return (
+      <div className="flex h-full flex-col">
+        <PageHeader>
+          <div className="flex flex-1 items-center justify-between">
+            <h1 className="font-semibold text-lg tracking-tight">Leads</h1>
+          </div>
+        </PageHeader>
+        <div className="flex-1 p-4">
+          <div className="space-y-3">
+            <div className="h-8 w-64 animate-pulse rounded-md bg-muted/60" />
+            <div className="space-y-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  className="h-12 w-full animate-pulse rounded-md bg-muted/40"
+                  key={`skel-${
+                    // biome-ignore lint/suspicious/noArrayIndexKey: skeleton
+                    i
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -283,11 +307,7 @@ export function LeadsPageClient() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Avatar className="size-7">
-                        <AvatarFallback className="bg-muted text-[10px] text-muted-foreground">
-                          {getInitials(lead.name)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar name={lead.name} size="md" />
                       <div className="min-w-0">
                         <p className="truncate font-medium text-sm">
                           {lead.name}
@@ -303,11 +323,7 @@ export function LeadsPageClient() {
                   <TableCell>
                     {lead.assignedUser ? (
                       <div className="flex items-center gap-2">
-                        <Avatar className="size-6">
-                          <AvatarFallback className="bg-primary/10 text-[9px] text-primary">
-                            {getInitials(lead.assignedUser.name)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar name={lead.assignedUser.name} size="sm" />
                         <span className="truncate text-sm">
                           {lead.assignedUser.name}
                         </span>

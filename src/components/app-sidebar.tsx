@@ -10,7 +10,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/micro";
 import {
   Sidebar,
   SidebarContent,
@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/sidebar";
 import { signOut, useSession } from "@/lib/auth-client";
 import { useGoogleConnection } from "@/lib/queries";
-import { getInitials } from "@/lib/utils";
 
 const navItems = [
   { title: "Dashboard", href: "/", icon: DashboardBrowsingIcon },
@@ -129,11 +128,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" tooltip={user?.name ?? "Account"}>
-              <Avatar className="size-7">
-                <AvatarFallback className="bg-primary/10 font-medium text-primary text-xs">
-                  {getInitials(user?.name)}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar name={user?.name} size="md" />
               <div className="flex min-w-0 flex-col">
                 <span className="truncate font-medium text-sm">
                   {user?.name ?? "Loading..."}
