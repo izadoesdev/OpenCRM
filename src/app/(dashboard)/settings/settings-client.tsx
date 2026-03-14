@@ -18,7 +18,8 @@ const SECTIONS = [
 
 export function SettingsClient() {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [activeSection, setActiveSection] = useState(SECTIONS[0].id);
+  type SectionId = (typeof SECTIONS)[number]["id"];
+  const [activeSection, setActiveSection] = useState<SectionId>(SECTIONS[0].id);
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -26,11 +27,15 @@ export function SettingsClient() {
       return;
     }
 
+    const ids = SECTIONS.map((s) => s.id);
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id);
+          if (
+            entry.isIntersecting &&
+            ids.includes(entry.target.id as SectionId)
+          ) {
+            setActiveSection(entry.target.id as SectionId);
           }
         }
       },
