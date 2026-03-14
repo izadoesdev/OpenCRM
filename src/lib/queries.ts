@@ -514,6 +514,10 @@ export function useSendEmail() {
         body: string;
         templateId?: string;
         sendVia?: "resend" | "gmail";
+        cc?: string;
+        bcc?: string;
+        threadId?: string;
+        replyToMessageId?: string;
       };
     }) => sendLeadEmail(leadId, data),
     onSuccess: (_, { leadId, data }) => {

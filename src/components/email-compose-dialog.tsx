@@ -48,12 +48,18 @@ export function EmailComposeDialog({
   const [body, setBody] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [sendVia, setSendVia] = useState<"resend" | "gmail">("resend");
+  const [cc, setCc] = useState("");
+  const [bcc, setBcc] = useState("");
+  const [showCcBcc, setShowCcBcc] = useState(false);
 
   useEffect(() => {
     if (open) {
       setSubject("");
       setBody("");
       setTemplateId("");
+      setCc("");
+      setBcc("");
+      setShowCcBcc(false);
       setSendVia(gConn?.hasGmail ? "gmail" : "resend");
     }
   }, [open, gConn?.hasGmail]);
@@ -83,6 +89,8 @@ export function EmailComposeDialog({
           body,
           templateId: templateId || undefined,
           sendVia,
+          cc: cc.trim() || undefined,
+          bcc: bcc.trim() || undefined,
         },
       },
       { onSuccess: () => onOpenChange(false) }
@@ -137,12 +145,23 @@ export function EmailComposeDialog({
           )}
 
           <div className="space-y-1.5">
-            <label
-              className="text-muted-foreground text-xs"
-              htmlFor="email-subject"
-            >
-              Subject *
-            </label>
+            <div className="flex items-center justify-between">
+              <label
+                className="text-muted-foreground text-xs"
+                htmlFor="email-subject"
+              >
+                Subject *
+              </label>
+              {!showCcBcc && (
+                <button
+                  className="text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+                  onClick={() => setShowCcBcc(true)}
+                  type="button"
+                >
+                  CC / BCC
+                </button>
+              )}
+            </div>
             <Input
               autoFocus
               id="email-subject"
@@ -152,6 +171,39 @@ export function EmailComposeDialog({
               value={subject}
             />
           </div>
+
+          {showCcBcc && (
+            <>
+              <div className="space-y-1.5">
+                <label
+                  className="text-muted-foreground text-xs"
+                  htmlFor="email-cc"
+                >
+                  CC
+                </label>
+                <Input
+                  id="email-cc"
+                  onChange={(e) => setCc(e.target.value)}
+                  placeholder="cc@example.com, ..."
+                  value={cc}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label
+                  className="text-muted-foreground text-xs"
+                  htmlFor="email-bcc"
+                >
+                  BCC
+                </label>
+                <Input
+                  id="email-bcc"
+                  onChange={(e) => setBcc(e.target.value)}
+                  placeholder="bcc@example.com, ..."
+                  value={bcc}
+                />
+              </div>
+            </>
+          )}
 
           <div className="space-y-1.5">
             <label

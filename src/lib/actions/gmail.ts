@@ -34,6 +34,7 @@ function buildRawEmail(opts: {
   subject: string;
   body: string;
   cc?: string;
+  bcc?: string;
   replyToMessageId?: string;
   threadId?: string;
 }): string {
@@ -44,6 +45,9 @@ function buildRawEmail(opts: {
   lines.push(`To: ${opts.to}`);
   if (opts.cc) {
     lines.push(`Cc: ${opts.cc}`);
+  }
+  if (opts.bcc) {
+    lines.push(`Bcc: ${opts.bcc}`);
   }
   lines.push(`Subject: ${opts.subject}`);
   lines.push("MIME-Version: 1.0");
@@ -74,6 +78,8 @@ export async function sendGmailEmail(data: {
   subject: string;
   body: string;
   cc?: string;
+  bcc?: string;
+  replyToMessageId?: string;
   threadId?: string;
 }): Promise<{ messageId: string; threadId: string }> {
   const user = await getUser();
@@ -84,6 +90,8 @@ export async function sendGmailEmail(data: {
     subject: data.subject,
     body: data.body,
     cc: data.cc,
+    bcc: data.bcc,
+    replyToMessageId: data.replyToMessageId,
     threadId: data.threadId,
   });
 
@@ -110,11 +118,14 @@ export async function sendGmailEmail(data: {
 }
 
 export interface GmailMessage {
+  bcc: string;
   bodyHtml: string;
   bodyText: string;
+  cc: string;
   from: string;
   id: string;
   internalDate: string;
+  messageId: string;
   snippet: string;
   subject: string;
   threadId: string;
@@ -160,7 +171,8 @@ function getHeader(headers: GmailHeader[], name: string): string {
 function decodeBase64url(data: string): string {
   try {
     const padded = data.replace(/-/g, "+").replace(/_/g, "/");
-    return atob(padded);
+    const bytes = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
   } catch {
     return "";
   }
@@ -195,10 +207,13 @@ function parseMessage(raw: GmailRawMessage): GmailMessage {
   return {
     id: raw.id,
     threadId: raw.threadId,
+    messageId: getHeader(raw.payload.headers, "Message-ID"),
     snippet: raw.snippet,
     internalDate: raw.internalDate,
     from: getHeader(raw.payload.headers, "From"),
     to: getHeader(raw.payload.headers, "To"),
+    cc: getHeader(raw.payload.headers, "Cc"),
+    bcc: getHeader(raw.payload.headers, "Bcc"),
     subject: getHeader(raw.payload.headers, "Subject"),
     bodyHtml: html,
     bodyText: text,
@@ -207,7 +222,7 @@ function parseMessage(raw: GmailRawMessage): GmailMessage {
 
 export async function getLeadEmails(
   leadEmail: string,
-  maxResults = 15
+  maxResults = 50
 ): Promise<GmailMessage[]> {
   await getUser();
 

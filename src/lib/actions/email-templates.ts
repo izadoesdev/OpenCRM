@@ -65,6 +65,10 @@ export async function sendLeadEmail(
     body: string;
     templateId?: string;
     sendVia?: "resend" | "gmail";
+    cc?: string;
+    bcc?: string;
+    threadId?: string;
+    replyToMessageId?: string;
   }
 ) {
   const user = await getUser();
@@ -92,6 +96,10 @@ export async function sendLeadEmail(
       to: row.email,
       subject,
       body,
+      cc: data.cc,
+      bcc: data.bcc,
+      threadId: data.threadId,
+      replyToMessageId: data.replyToMessageId,
     });
     gmailMeta = {
       gmailMessageId: result.messageId,
