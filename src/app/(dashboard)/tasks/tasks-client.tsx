@@ -340,11 +340,16 @@ function TaskRow({
 
 function AddTaskForm({
   teamMembers,
+  currentUserId,
   onClose,
 }: {
   teamMembers: Array<{ id: string; name: string; email: string }>;
+  currentUserId?: string;
   onClose: () => void;
 }) {
+  const others = currentUserId
+    ? teamMembers.filter((m) => m.id !== currentUserId)
+    : teamMembers;
   const { data: leads = [] } = useLeads();
   const createTask = useCreateTask();
   const [title, setTitle] = useState("");
@@ -434,7 +439,7 @@ function AddTaskForm({
           value={assignee}
         >
           <SelectItem value="_self">Myself</SelectItem>
-          {teamMembers.map((m) => (
+          {others.map((m) => (
             <SelectItem key={m.id} value={m.id}>
               {m.name}
             </SelectItem>
@@ -687,6 +692,7 @@ export function TasksPageClient() {
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
         {showAddTask && (
           <AddTaskForm
+            currentUserId={currentUserId}
             onClose={() => setShowAddTask(false)}
             teamMembers={
               teamMembers as Array<{
