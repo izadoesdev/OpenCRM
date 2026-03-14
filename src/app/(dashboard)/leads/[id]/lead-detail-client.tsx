@@ -2,14 +2,11 @@
 
 import {
   ArrowLeft02Icon,
-  CallIcon,
   Delete02Icon,
   Edit02Icon,
-  Globe02Icon,
   Mail01Icon,
   MoreHorizontalIcon,
   Task01Icon,
-  UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
@@ -19,16 +16,10 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmailComposeDialog } from "@/components/email-compose-dialog";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
 import { LogActivityDialog } from "@/components/log-activity-dialog";
-import {
-  DetailField,
-  Pill,
-  SectionHeader,
-  UserAvatar,
-} from "@/components/micro";
 import { PageHeader } from "@/components/page-header";
 import { PageSkeleton } from "@/components/page-skeleton";
 import { SegmentedControl } from "@/components/segmented-control";
-import { StatusBadge, StatusDot } from "@/components/status-badge";
+import { StatusDot } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -37,11 +28,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/lib/auth-client";
-import { LEAD_STATUSES, SOURCE_LABELS, STATUS_LABELS } from "@/lib/constants";
-import dayjs from "@/lib/dayjs";
+import { LEAD_STATUSES, STATUS_LABELS } from "@/lib/constants";
 import {
   useAddNote,
   useAssignLead,
@@ -54,16 +42,19 @@ import {
   useTeamMembers,
   useUpdateLead,
 } from "@/lib/queries";
-import { formatCents, formatWebsite } from "@/lib/utils";
 import { ActivityTimeline } from "./_components/activity-timeline";
+import {
+  AssignedToSection,
+  DetailsSidebar,
+} from "./_components/details-sidebar";
 import { EmailThreadView } from "./_components/email-thread-view";
-import { ScoreHoverCard, useLeadScore } from "./_components/lead-score";
 import {
   LeadTasksSidebar,
   type TeamMember,
 } from "./_components/lead-tasks-sidebar";
+import { NoteInput } from "./_components/note-input";
+import { ProfileStrip } from "./_components/profile-strip";
 
-// ── Main orchestrator ───────────────────────────────────────────────────────
 export function LeadDetailClient({ leadId }: { leadId: string }) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -217,7 +208,6 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
         {/* LEFT — Profile + Activity */}
         <div className="flex min-h-0 flex-1 flex-col border-r">
           <ProfileStrip lead={lead} />
-
           <NoteInput
             isPending={addNote.isPending}
             noteText={noteText}
@@ -277,14 +267,12 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
             setFieldValue={setFieldValue}
             updateLeadMut={updateLeadMut}
           />
-
           <AssignedToSection
             assignLead={assignLead}
             lead={lead}
             leadId={id}
             teamMembers={teamMembers as TeamMember[]}
           />
-
           <LeadTasksSidebar
             currentUserId={session?.user?.id ?? undefined}
             leadId={id}
@@ -321,354 +309,6 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
         title="Archive this lead?"
         variant="danger"
       />
-    </div>
-  );
-}
-
-// ── Profile strip ───────────────────────────────────────────────────────────
-function ProfileStrip({
-  lead,
-}: {
-  lead: {
-    name: string;
-    status: string;
-    value: number;
-    activities?: unknown[];
-    tasks?: unknown[];
-    createdAt: Date;
-    title: string | null;
-    company: string | null;
-    email: string;
-  };
-}) {
-  const breakdown = useLeadScore(lead);
-  return (
-    <div className="shrink-0 border-b px-6 py-4">
-      <div className="flex items-center gap-4">
-        <UserAvatar name={lead.name} size="xl" />
-        <div className="min-w-0">
-          <div className="flex items-center gap-2.5">
-            <h1 className="truncate font-semibold text-lg tracking-tight">
-              {lead.name}
-            </h1>
-            <StatusBadge status={lead.status} />
-            <ScoreHoverCard breakdown={breakdown} />
-          </div>
-          <p className="truncate text-muted-foreground text-sm">
-            {[lead.title, lead.company].filter(Boolean).join(" at ") ||
-              lead.email}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Note input ──────────────────────────────────────────────────────────────
-function NoteInput({
-  noteText,
-  setNoteText,
-  onAddNote,
-  isPending,
-}: {
-  noteText: string;
-  setNoteText: (v: string) => void;
-  onAddNote: () => void;
-  isPending: boolean;
-}) {
-  return (
-    <div className="shrink-0 border-b px-6 py-3">
-      <div className="flex gap-2">
-        <Textarea
-          className="min-h-[40px] flex-1 resize-none text-sm"
-          onChange={(e) => setNoteText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              onAddNote();
-            }
-          }}
-          placeholder="Add a note... (⌘ Enter)"
-          rows={1}
-          value={noteText}
-        />
-        <Button
-          className="shrink-0 self-end"
-          disabled={isPending || !noteText.trim()}
-          onClick={onAddNote}
-          size="sm"
-          variant="outline"
-        >
-          Add
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ── Detail row (contact info link) ──────────────────────────────────────────
-function DetailRow({
-  icon,
-  href,
-  external,
-  children,
-}: {
-  icon: typeof Mail01Icon;
-  href: string;
-  external?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <a
-      className="flex items-center gap-3 text-muted-foreground text-sm transition-colors hover:text-foreground"
-      href={href}
-      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-    >
-      <HugeiconsIcon
-        className="shrink-0"
-        icon={icon}
-        size={14}
-        strokeWidth={1.5}
-      />
-      <span className="truncate">{children}</span>
-    </a>
-  );
-}
-
-// ── Details sidebar ─────────────────────────────────────────────────────────
-function DetailsSidebar({
-  lead,
-  updateLeadMut,
-  addingField,
-  setAddingField,
-  fieldKey,
-  setFieldKey,
-  fieldValue,
-  setFieldValue,
-}: {
-  lead: {
-    id: string;
-    email: string;
-    phone: string | null;
-    website: string | null;
-    source: string;
-    value: number;
-    plan: string | null;
-    createdAt: Date;
-    customFields: unknown;
-  };
-  updateLeadMut: ReturnType<typeof useUpdateLead>;
-  addingField: boolean;
-  setAddingField: (v: boolean) => void;
-  fieldKey: string;
-  setFieldKey: (v: string) => void;
-  fieldValue: string;
-  setFieldValue: (v: string) => void;
-}) {
-  return (
-    <div className="shrink-0 border-b px-5 py-4">
-      <SectionHeader>Details</SectionHeader>
-      <div className="space-y-2">
-        <DetailRow href={`mailto:${lead.email}`} icon={Mail01Icon}>
-          {lead.email}
-        </DetailRow>
-        {lead.phone && (
-          <DetailRow href={`tel:${lead.phone}`} icon={CallIcon}>
-            {lead.phone}
-          </DetailRow>
-        )}
-        {lead.website && (
-          <DetailRow
-            external
-            href={
-              lead.website.startsWith("http")
-                ? lead.website
-                : `https://${lead.website}`
-            }
-            icon={Globe02Icon}
-          >
-            {formatWebsite(lead.website)}
-          </DetailRow>
-        )}
-        <DetailField label="Source">
-          {SOURCE_LABELS[lead.source] ?? lead.source}
-        </DetailField>
-        {lead.value > 0 && (
-          <DetailField label="Value">
-            <span className="font-mono">{formatCents(lead.value)}</span>
-          </DetailField>
-        )}
-        {lead.plan && (
-          <DetailField label="Plan">
-            <Pill
-              className="font-medium uppercase tracking-wider"
-              variant="success"
-            >
-              {lead.plan}
-            </Pill>
-          </DetailField>
-        )}
-        <DetailField label="Added">
-          <span className="text-muted-foreground">
-            {dayjs(lead.createdAt).format("MMM D, YYYY")}
-          </span>
-        </DetailField>
-        {(() => {
-          const cf = lead.customFields as Record<string, string> | null;
-          if (!cf || Object.keys(cf).length === 0) {
-            return null;
-          }
-          return Object.entries(cf).map(([key, val]) => (
-            <DetailField key={key} label={key}>
-              {val}
-            </DetailField>
-          ));
-        })()}
-        <div className="mt-2">
-          {addingField ? (
-            <div className="flex items-center gap-2">
-              <Input
-                className="h-7 w-24 text-xs"
-                onChange={(e) => setFieldKey(e.target.value)}
-                placeholder="Field name"
-                value={fieldKey}
-              />
-              <Input
-                className="h-7 flex-1 text-xs"
-                onChange={(e) => setFieldValue(e.target.value)}
-                placeholder="Value"
-                value={fieldValue}
-              />
-              <Button
-                disabled={!(fieldKey.trim() && fieldValue.trim())}
-                onClick={() => {
-                  const current = (lead.customFields ?? {}) as Record<
-                    string,
-                    string
-                  >;
-                  updateLeadMut.mutate({
-                    id: lead.id,
-                    data: {
-                      customFields: {
-                        ...current,
-                        [fieldKey.trim()]: fieldValue.trim(),
-                      },
-                    },
-                  });
-                  setFieldKey("");
-                  setFieldValue("");
-                  setAddingField(false);
-                }}
-                size="sm"
-                variant="ghost"
-              >
-                Save
-              </Button>
-              <Button
-                onClick={() => setAddingField(false)}
-                size="sm"
-                variant="ghost"
-              >
-                Cancel
-              </Button>
-            </div>
-          ) : (
-            <button
-              className="text-muted-foreground text-xs hover:text-foreground"
-              onClick={() => setAddingField(true)}
-              type="button"
-            >
-              + Add field
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Assigned To ─────────────────────────────────────────────────────────────
-function AssignedToSection({
-  lead,
-  leadId,
-  teamMembers,
-  assignLead,
-}: {
-  lead: {
-    assignedTo: string | null;
-    assignedUser: { name: string; email: string } | null;
-  };
-  leadId: string;
-  teamMembers: TeamMember[];
-  assignLead: ReturnType<typeof useAssignLead>;
-}) {
-  return (
-    <div className="shrink-0 border-b px-5 py-4">
-      <SectionHeader>Assigned To</SectionHeader>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <button
-              className="flex w-full items-center gap-3 rounded-md border border-transparent p-2 text-left transition-colors hover:border-border hover:bg-muted/40"
-              type="button"
-            />
-          }
-        >
-          {lead.assignedUser ? (
-            <>
-              <UserAvatar name={lead.assignedUser.name} size="lg" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-sm">
-                  {lead.assignedUser.name}
-                </p>
-                <p className="truncate text-muted-foreground text-xs">
-                  {lead.assignedUser.email}
-                </p>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex size-8 items-center justify-center rounded-full border border-muted-foreground/30 border-dashed">
-                <HugeiconsIcon
-                  className="text-muted-foreground/50"
-                  icon={UserIcon}
-                  size={14}
-                  strokeWidth={1.5}
-                />
-              </div>
-              <span className="text-muted-foreground text-sm">
-                Click to assign
-              </span>
-            </>
-          )}
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-64">
-          {teamMembers.map((m) => (
-            <DropdownMenuItem
-              key={m.id}
-              onClick={() => assignLead.mutate({ leadId, assignedTo: m.id })}
-            >
-              <UserAvatar name={m.name} size="sm" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm">{m.name}</p>
-              </div>
-              {lead.assignedTo === m.id && (
-                <Pill variant="primary">current</Pill>
-              )}
-            </DropdownMenuItem>
-          ))}
-          {lead.assignedTo && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => assignLead.mutate({ leadId, assignedTo: null })}
-              >
-                Unassign
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
   );
 }
