@@ -18,6 +18,7 @@ import { db } from "@/db";
 import { activity, lead, task, user as userTable } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import dayjs from "@/lib/dayjs";
+import { fireWebhooks } from "@/lib/webhook-dispatch";
 
 async function getUser() {
   const session = await auth.api.getSession({
@@ -131,6 +132,13 @@ export async function createLead(data: {
     return inserted;
   });
 
+  fireWebhooks("lead.created", {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    source: row.source,
+  });
+
   revalidatePath("/leads");
   revalidatePath("/pipeline");
   revalidatePath("/");
@@ -199,6 +207,12 @@ export async function updateLead(
     }
   }
 
+  fireWebhooks("lead.updated", {
+    id: row.id,
+    name: row.name,
+    changes: Object.keys(data),
+  });
+
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);
   revalidatePath("/pipeline");
@@ -212,6 +226,9 @@ export async function deleteLead(id: string) {
     .update(lead)
     .set({ archivedAt: dayjs().toDate() })
     .where(eq(lead.id, id));
+
+  fireWebhooks("lead.deleted", { id });
+
   revalidatePath("/leads");
   revalidatePath("/pipeline");
   revalidatePath("/");

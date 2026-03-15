@@ -3,11 +3,70 @@
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
 import type * as React from "react";
+import { useCallback, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-function Sheet({ ...props }: SheetPrimitive.Root.Props) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />;
+function Sheet({
+  dirty,
+  onOpenChange: onOpenChangeProp,
+  ...props
+}: SheetPrimitive.Root.Props & { dirty?: boolean }) {
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open && dirty) {
+        setShowConfirm(true);
+        return;
+      }
+      onOpenChangeProp?.(open);
+    },
+    [dirty, onOpenChangeProp]
+  );
+
+  return (
+    <>
+      <SheetPrimitive.Root
+        data-slot="sheet"
+        onOpenChange={handleOpenChange}
+        {...props}
+      />
+      <AlertDialog onOpenChange={setShowConfirm} open={showConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes that will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                setShowConfirm(false);
+                onOpenChangeProp?.(false);
+              }}
+              variant="destructive"
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 }
 
 function SheetTrigger({ ...props }: SheetPrimitive.Trigger.Props) {

@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { activity, lead } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import dayjs from "@/lib/dayjs";
+import { fireWebhooks } from "@/lib/webhook-dispatch";
 
 export interface SuggestedTask {
   description?: string | null;
@@ -72,6 +73,13 @@ export async function changeLeadStatus(
         opts?.note ?? `Status changed from ${existing.status} to ${newStatus}`,
       metadata: { oldStatus: existing.status, newStatus },
     });
+  });
+
+  fireWebhooks("lead.status_changed", {
+    id: leadId,
+    name: existing.name,
+    oldStatus: existing.status,
+    newStatus,
   });
 
   let suggestedTask: SuggestedTask | null = null;

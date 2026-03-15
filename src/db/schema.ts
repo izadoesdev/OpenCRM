@@ -15,6 +15,13 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
+  preferences: jsonb("preferences")
+    .$type<{
+      digestEnabled?: boolean;
+      timezone?: string;
+      dateFormat?: string;
+    }>()
+    .default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -223,6 +230,54 @@ export const emailTemplate = pgTable("email_template", {
     .notNull(),
 });
 
+// ── App settings (singleton) ──
+
+export const appSettings = pgTable("app_settings", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => "default"),
+  currency: text("currency").notNull().default("USD"),
+  dateFormat: text("date_format").notNull().default("MM/DD/YYYY"),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
+
+export const customFieldDefinition = pgTable("custom_field_definition", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  type: text("type").notNull().default("text"),
+  required: boolean("required").default(false).notNull(),
+  options: jsonb("options").$type<string[]>().default([]),
+  position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const webhook = pgTable(
+  "webhook",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    url: text("url").notNull(),
+    events: jsonb("events").$type<string[]>().notNull().default([]),
+    secret: text("secret").notNull(),
+    active: boolean("active").default(true).notNull(),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("webhook_createdBy_idx").on(table.createdBy)]
+);
+
 // ── Relations ──
 
 export const userRelations = relations(user, ({ many }) => ({
@@ -289,6 +344,13 @@ export const emailTemplateRelations = relations(emailTemplate, ({ one }) => ({
 export const apiKeyRelations = relations(apiKey, ({ one }) => ({
   creator: one(user, {
     fields: [apiKey.createdBy],
+    references: [user.id],
+  }),
+}));
+
+export const webhookRelations = relations(webhook, ({ one }) => ({
+  creator: one(user, {
+    fields: [webhook.createdBy],
     references: [user.id],
   }),
 }));

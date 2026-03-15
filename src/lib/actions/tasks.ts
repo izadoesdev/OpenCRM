@@ -13,6 +13,7 @@ import {
 } from "@/lib/actions/calendar";
 import { auth } from "@/lib/auth";
 import dayjs from "@/lib/dayjs";
+import { fireWebhooks } from "@/lib/webhook-dispatch";
 import type { SuggestedTask } from "./status";
 
 async function getUser() {
@@ -242,6 +243,12 @@ export async function createTask(data: {
     return inserted;
   });
 
+  fireWebhooks("task.created", {
+    id: row.id,
+    title: row.title,
+    leadId: row.leadId,
+  });
+
   revalidateAll(data.leadId);
   return row;
 }
@@ -330,6 +337,12 @@ export async function completeTask(id: string) {
       dueAt: nextDue,
     };
   }
+
+  fireWebhooks("task.completed", {
+    id,
+    title: existing.title,
+    leadId: existing.leadId,
+  });
 
   revalidateAll(row?.leadId);
   return { ...row, suggestedTask };
@@ -450,6 +463,14 @@ export async function deleteTask(id: string) {
     } catch {
       /* calendar sync best-effort */
     }
+  }
+
+  if (existing) {
+    fireWebhooks("task.deleted", {
+      id,
+      title: existing.title,
+      leadId: existing.leadId,
+    });
   }
 
   revalidateAll(row?.leadId);

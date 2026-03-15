@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { toast } from "sonner";
 import { useTaskSuggestion } from "@/components/task-suggestion-provider";
 import {
@@ -50,17 +51,36 @@ import {
 import { getTeamMembers } from "@/lib/actions/team";
 import { STATUS_LABELS } from "@/lib/constants";
 import dayjs from "@/lib/dayjs";
+import { formatCents } from "@/lib/utils";
 import {
   createApiKey,
   deleteApiKey,
   getApiKeys,
   revokeApiKey,
 } from "./actions/api-keys";
+import { getAppSettings, updateAppSettings } from "./actions/app-settings";
 import {
   getCalendarEvent,
   getUpcomingCalendarEvents,
 } from "./actions/calendar";
+import {
+  exportActivities,
+  exportLeads,
+  exportTasks,
+} from "./actions/data-export";
 import { getLeadEmails } from "./actions/gmail";
+import {
+  disconnectGoogle,
+  getProfile,
+  updatePreferences,
+  updateProfile,
+} from "./actions/profile";
+import {
+  createWebhook,
+  deleteWebhook,
+  getWebhooks,
+  updateWebhook,
+} from "./actions/webhooks";
 import { checkGoogleConnection } from "./google";
 
 // ---------------------------------------------------------------------------
@@ -81,6 +101,9 @@ export const queryKeys = {
   calendarEvent: (id: string) => ["calendar-event", id] as const,
   leadEmails: (email: string) => ["lead-emails", email] as const,
   googleConnection: ["google-connection"] as const,
+  profile: ["profile"] as const,
+  appSettings: ["app-settings"] as const,
+  webhooks: ["webhooks"] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -1012,4 +1035,166 @@ export function useDeleteApiKey() {
       toast.success("API key deleted");
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Profile & Preferences
+// ---------------------------------------------------------------------------
+
+export function useProfile() {
+  return useQuery({
+    queryKey: queryKeys.profile,
+    queryFn: () => getProfile(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name?: string; image?: string }) =>
+      updateProfile(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.profile });
+      toast.success("Profile updated");
+    },
+    onError: () => toast.error("Failed to update profile"),
+  });
+}
+
+export function useUpdatePreferences() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (prefs: {
+      digestEnabled?: boolean;
+      timezone?: string;
+      dateFormat?: string;
+    }) => updatePreferences(prefs),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.profile });
+      toast.success("Preferences saved");
+    },
+    onError: () => toast.error("Failed to save preferences"),
+  });
+}
+
+export function useDisconnectGoogle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => disconnectGoogle(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.googleConnection });
+      toast.success("Google account disconnected");
+    },
+    onError: () => toast.error("Failed to disconnect Google"),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// App Settings
+// ---------------------------------------------------------------------------
+
+export function useAppSettings() {
+  return useQuery({
+    queryKey: queryKeys.appSettings,
+    queryFn: () => getAppSettings(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useUpdateAppSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof updateAppSettings>[0]) =>
+      updateAppSettings(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.appSettings });
+      toast.success("Settings saved");
+    },
+    onError: () => toast.error("Failed to save settings"),
+  });
+}
+
+export function useFormatCents() {
+  const { data: settings } = useAppSettings();
+  const currency = settings?.currency ?? "USD";
+  return useCallback(
+    (cents: number) => formatCents(cents, currency),
+    [currency]
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Custom Fields
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Webhooks
+// ---------------------------------------------------------------------------
+
+export function useWebhooks() {
+  return useQuery({
+    queryKey: queryKeys.webhooks,
+    queryFn: () => getWebhooks(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useCreateWebhook() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { url: string; events: string[] }) =>
+      createWebhook(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.webhooks });
+      toast.success("Webhook created");
+    },
+    onError: () => toast.error("Failed to create webhook"),
+  });
+}
+
+export function useUpdateWebhook() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: Parameters<typeof updateWebhook>[1];
+    }) => updateWebhook(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.webhooks });
+      toast.success("Webhook updated");
+    },
+    onError: () => toast.error("Failed to update webhook"),
+  });
+}
+
+export function useDeleteWebhook() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteWebhook,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.webhooks });
+      toast.success("Webhook deleted");
+    },
+    onError: () => toast.error("Failed to delete webhook"),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Data Export
+// ---------------------------------------------------------------------------
+
+export function useExportLeads() {
+  return useMutation({ mutationFn: () => exportLeads() });
+}
+
+export function useExportTasks() {
+  return useMutation({ mutationFn: () => exportTasks() });
+}
+
+export function useExportActivities() {
+  return useMutation({ mutationFn: () => exportActivities() });
 }

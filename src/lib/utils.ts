@@ -18,11 +18,21 @@ export function getInitials(name: string | null | undefined): string {
     .slice(0, 2);
 }
 
-export function formatCents(cents: number): string {
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  CAD: "C$",
+  AUD: "A$",
+  JPY: "¥",
+};
+
+export function formatCents(cents: number, currency = "USD"): string {
   if (cents === 0) {
     return "—";
   }
-  return `$${(cents / 100).toLocaleString()}`;
+  const symbol = CURRENCY_SYMBOLS[currency] ?? "$";
+  return `${symbol}${(cents / 100).toLocaleString()}`;
 }
 
 const RE_PROTOCOL = /^https?:\/\/(www\.)?/;

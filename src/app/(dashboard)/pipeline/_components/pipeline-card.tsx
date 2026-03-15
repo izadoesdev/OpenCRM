@@ -6,7 +6,8 @@ import Link from "next/link";
 import { UserAvatar } from "@/components/micro";
 import type { LeadRow } from "@/lib/actions/leads";
 import dayjs from "@/lib/dayjs";
-import { cn, formatCents } from "@/lib/utils";
+import { useFormatCents } from "@/lib/queries";
+import { cn } from "@/lib/utils";
 
 interface PipelineCardProps {
   isDragOverlay?: boolean;
@@ -45,6 +46,7 @@ function PipelineCardContent({
   lead: PipelineCardProps["lead"];
   isOverlay?: boolean;
 }) {
+  const fmtCents = useFormatCents();
   return (
     <div
       className={cn(
@@ -76,7 +78,7 @@ function PipelineCardContent({
             </span>
             {lead.value > 0 && (
               <span className="shrink-0 font-mono text-xs tabular-nums">
-                {formatCents(lead.value)}
+                {fmtCents(lead.value)}
               </span>
             )}
           </div>

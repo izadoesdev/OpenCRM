@@ -2,14 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -18,6 +10,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { LEAD_SOURCES, SOURCE_LABELS } from "@/lib/constants";
 import {
   useCheckDuplicateEmail,
@@ -25,6 +25,54 @@ import {
   useUpdateLead,
 } from "@/lib/queries";
 import { TIMEZONE_GROUPS } from "@/lib/timezones";
+
+const WEBSITE_URL_REGEX = /^https?:\/\//;
+
+function stripProtocol(url: string) {
+  return url.replace(WEBSITE_URL_REGEX, "");
+}
+
+function computeDirty(
+  fields: {
+    name: string;
+    email: string;
+    company: string;
+    title: string;
+    phone: string;
+    website: string;
+    source: string;
+    valueDollars: string;
+    country: string;
+    tz: string;
+  },
+  lead?: LeadData | null
+) {
+  if (!lead?.id) {
+    const { name, email, company, title, phone, website, valueDollars } =
+      fields;
+    return !!(
+      name ||
+      email ||
+      company ||
+      title ||
+      phone ||
+      website ||
+      valueDollars
+    );
+  }
+  return (
+    fields.name !== (lead.name ?? "") ||
+    fields.email !== (lead.email ?? "") ||
+    fields.company !== (lead.company ?? "") ||
+    fields.title !== (lead.title ?? "") ||
+    fields.phone !== (lead.phone ?? "") ||
+    fields.website !== stripProtocol(lead.website ?? "") ||
+    fields.source !== (lead.source ?? "manual") ||
+    fields.valueDollars !== (lead.value ? (lead.value / 100).toString() : "") ||
+    fields.country !== (lead.country ?? "") ||
+    fields.tz !== (lead.timezone ?? "")
+  );
+}
 
 const COMMON_TITLES = [
   "CEO",
@@ -83,6 +131,22 @@ export function LeadFormDialog({
 
   const duplicateCheck = useCheckDuplicateEmail(email);
 
+  const isDirty = computeDirty(
+    {
+      name,
+      email,
+      company,
+      title,
+      phone,
+      website,
+      source,
+      valueDollars,
+      country,
+      tz,
+    },
+    lead
+  );
+
   useEffect(() => {
     if (open) {
       setName(lead?.name ?? "");
@@ -90,7 +154,7 @@ export function LeadFormDialog({
       setCompany(lead?.company ?? "");
       setTitle(lead?.title ?? "");
       setPhone(lead?.phone ?? "");
-      setWebsite((lead?.website ?? "").replace(/^https?:\/\//, ""));
+      setWebsite((lead?.website ?? "").replace(WEBSITE_URL_REGEX, ""));
       setSource(lead?.source ?? "manual");
       setValueDollars(lead?.value ? (lead.value / 100).toString() : "");
       setCountry(lead?.country ?? "");
@@ -133,18 +197,24 @@ export function LeadFormDialog({
   const submitLabel = isEdit ? "Save Changes" : "Add Lead";
 
   return (
-    <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Lead" : "Add Lead"}</DialogTitle>
-          <DialogDescription>
+    <Sheet dirty={isDirty} onOpenChange={onOpenChange} open={open}>
+      <SheetContent
+        className="overflow-y-auto rounded-xl shadow-lg data-[side=right]:inset-y-3 data-[side=right]:right-3 data-[side=right]:h-auto data-[side=right]:border sm:max-w-lg"
+        side="right"
+      >
+        <SheetHeader>
+          <SheetTitle>{isEdit ? "Edit Lead" : "Add Lead"}</SheetTitle>
+          <SheetDescription>
             {isEdit
               ? "Update lead information."
               : "Add a new lead to your pipeline."}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <form className="space-y-3" onSubmit={handleSubmit}>
+        <form
+          className="flex flex-1 flex-col gap-3 px-4"
+          onSubmit={handleSubmit}
+        >
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label
@@ -269,7 +339,7 @@ export function LeadFormDialog({
                   className="pl-[60px]"
                   id="lead-website"
                   onChange={(e) =>
-                    setWebsite(e.target.value.replace(/^https?:\/\//, ""))
+                    setWebsite(e.target.value.replace(WEBSITE_URL_REGEX, ""))
                   }
                   placeholder="company.com"
                   value={website}
@@ -380,13 +450,13 @@ export function LeadFormDialog({
             </div>
           </div>
 
-          <DialogFooter>
-            <Button disabled={isPending} type="submit">
+          <SheetFooter>
+            <Button className="w-full" disabled={isPending} type="submit">
               {isPending ? "Saving..." : submitLabel}
             </Button>
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

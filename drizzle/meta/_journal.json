@@ -8,6 +8,13 @@
       "when": 1773575626758,
       "tag": "0000_add-lead-country-timezone",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1773591158406,
+      "tag": "0001_hard_vulcan",
+      "breakpoints": true
     }
   ]
 }

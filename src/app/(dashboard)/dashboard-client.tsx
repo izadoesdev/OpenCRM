@@ -19,10 +19,10 @@ import dayjs from "@/lib/dayjs";
 import {
   useCalendarEvents,
   useDashboard,
+  useFormatCents,
   useGoogleConnection,
   useToggleTask,
 } from "@/lib/queries";
-import { formatCents } from "@/lib/utils";
 import { CalendarEvents } from "./_components/calendar-events";
 import {
   DashboardTasks,
@@ -33,6 +33,7 @@ import { type RecentLead, RecentLeads } from "./_components/recent-leads";
 import { StatCard, StatCardRow } from "./_components/stat-cards";
 
 export function DashboardClient() {
+  const fmtCents = useFormatCents();
   const [dateRange, setDateRange] = useState<
     "all" | "week" | "month" | "quarter"
   >("all");
@@ -118,7 +119,7 @@ export function DashboardClient() {
               color="bg-violet-500/10 text-violet-600"
               icon={MoneyReceive01Icon}
               label="Revenue"
-              value={formatCents(stats.revenue)}
+              value={fmtCents(stats.revenue)}
             />
           </StatCardRow>
 

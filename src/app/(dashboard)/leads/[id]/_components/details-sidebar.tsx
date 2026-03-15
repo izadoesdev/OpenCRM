@@ -22,9 +22,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { SOURCE_LABELS } from "@/lib/constants";
 import dayjs from "@/lib/dayjs";
-import type { useAssignLead, useUpdateLead } from "@/lib/queries";
+import {
+  type useAssignLead,
+  useFormatCents,
+  type useUpdateLead,
+} from "@/lib/queries";
 import { getTimezoneLabel } from "@/lib/timezones";
-import { formatCents, formatWebsite } from "@/lib/utils";
+import { formatWebsite } from "@/lib/utils";
 import type { TeamMember } from "./lead-tasks-sidebar";
 
 function DetailRow({
@@ -86,6 +90,7 @@ export function DetailsSidebar({
   fieldValue: string;
   setFieldValue: (v: string) => void;
 }) {
+  const fmtCents = useFormatCents();
   return (
     <div className="shrink-0 border-b px-5 py-4">
       <SectionHeader>Details</SectionHeader>
@@ -132,7 +137,7 @@ export function DetailsSidebar({
         )}
         {lead.value > 0 && (
           <DetailField label="Value">
-            <span className="font-mono">{formatCents(lead.value)}</span>
+            <span className="font-mono">{fmtCents(lead.value)}</span>
           </DetailField>
         )}
         {lead.plan && (

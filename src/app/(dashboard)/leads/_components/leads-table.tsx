@@ -35,12 +35,13 @@ import {
 import type { LeadRow } from "@/lib/actions/leads";
 import { SOURCE_LABELS } from "@/lib/constants";
 import dayjs from "@/lib/dayjs";
+import { useFormatCents } from "@/lib/queries";
 import {
   computeLeadScoreBreakdown,
   getScoreBgColor,
   getScoreColor,
 } from "@/lib/scoring";
-import { cn, formatCents } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 function SortableHead({
   active,
@@ -239,6 +240,7 @@ function LeadTableRow({
   onEdit: (lead: LeadRow) => void;
   onArchive: (id: string) => void;
 }) {
+  const fmtCents = useFormatCents();
   const bd = computeLeadScoreBreakdown({
     value: lead.value,
     status: lead.status,
@@ -300,7 +302,7 @@ function LeadTableRow({
         {SOURCE_LABELS[lead.source] ?? lead.source}
       </TableCell>
       <TableCell className="text-right font-mono text-sm tabular-nums">
-        {formatCents(lead.value)}
+        {fmtCents(lead.value)}
       </TableCell>
       <TableCell>
         <Tooltip>

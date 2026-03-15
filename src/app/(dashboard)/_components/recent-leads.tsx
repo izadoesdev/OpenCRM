@@ -5,7 +5,7 @@ import { UserAvatar } from "@/components/micro";
 import { EmptyState } from "@/components/page-skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import { formatCents } from "@/lib/utils";
+import { useFormatCents } from "@/lib/queries";
 
 export interface RecentLead {
   assignedUser: { id: string; name: string } | null;
@@ -18,6 +18,7 @@ export interface RecentLead {
 }
 
 export function RecentLeads({ leads }: { leads: RecentLead[] }) {
+  const fmtCents = useFormatCents();
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -51,7 +52,7 @@ export function RecentLeads({ leads }: { leads: RecentLead[] }) {
             )}
             {lead.value > 0 && (
               <span className="font-mono text-muted-foreground text-xs">
-                {formatCents(lead.value)}
+                {fmtCents(lead.value)}
               </span>
             )}
           </Link>

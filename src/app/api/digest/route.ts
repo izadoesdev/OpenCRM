@@ -34,10 +34,24 @@ export async function GET(req: Request) {
     if (!u) {
       continue;
     }
+
+    const prefs = (u as { preferences?: { digestEnabled?: boolean } })
+      .preferences;
+    if (prefs?.digestEnabled === false) {
+      continue;
+    }
+
     if (!byUser[u.id]) {
       byUser[u.id] = { email: u.email, name: u.name, tasks: [] };
     }
     byUser[u.id].tasks.push(t);
+  }
+
+  if (Object.keys(byUser).length === 0) {
+    return NextResponse.json({
+      sent: 0,
+      message: "No users with digest enabled have overdue tasks",
+    });
   }
 
   const results = await Promise.allSettled(
@@ -55,12 +69,12 @@ export async function GET(req: Request) {
         <p>Hi ${name},</p>
         <p>You have <strong>${userTasks.length}</strong> overdue task${userTasks.length === 1 ? "" : "s"}:</p>
         <ul>${taskLines}</ul>
-        <p>Log in to OpenCRM to take action.</p>
+        <p>Log in to take action.</p>
       `.trim();
 
         await sendEmail({
           to: email,
-          subject: `[OpenCRM] ${userTasks.length} overdue task${userTasks.length === 1 ? "" : "s"}`,
+          subject: `${userTasks.length} overdue task${userTasks.length === 1 ? "" : "s"}`,
           body: html,
         });
       }

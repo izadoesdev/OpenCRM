@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { activity, lead } from "@/db/schema";
 import { validateApiKey } from "@/lib/actions/api-keys";
 import { LEAD_SOURCES } from "@/lib/constants";
+import { fireWebhooks } from "@/lib/webhook-dispatch";
 
 const createLeadSchema = z.object({
   name: z.string().min(1, "name is required"),
@@ -82,6 +83,13 @@ export async function POST(req: Request) {
     });
 
     return inserted;
+  });
+
+  fireWebhooks("lead.created", {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    source: row.source,
   });
 
   return NextResponse.json(
