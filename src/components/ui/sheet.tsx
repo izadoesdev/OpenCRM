@@ -25,12 +25,17 @@ function Sheet({
   const [showConfirm, setShowConfirm] = useState(false);
 
   const handleOpenChange = useCallback(
-    (open: boolean) => {
+    (open: boolean, event?: unknown) => {
       if (!open && dirty) {
         setShowConfirm(true);
         return;
       }
-      onOpenChangeProp?.(open);
+      onOpenChangeProp?.(
+        open,
+        event as NonNullable<
+          Parameters<NonNullable<typeof onOpenChangeProp>>[1]
+        >
+      );
     },
     [dirty, onOpenChangeProp]
   );
@@ -56,7 +61,7 @@ function Sheet({
               onClick={(e) => {
                 e.preventDefault();
                 setShowConfirm(false);
-                onOpenChangeProp?.(false);
+                (onOpenChangeProp as (open: boolean) => void)?.(false);
               }}
               variant="destructive"
             >
