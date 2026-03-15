@@ -68,6 +68,22 @@ export function LeadsPageClient() {
     return true;
   });
 
+  const scoreMap =
+    sortKey === "score"
+      ? new Map(
+          filtered.map((l) => [
+            l.id,
+            computeLeadScoreBreakdown({
+              value: l.value,
+              status: l.status,
+              activitiesCount: 0,
+              tasksCount: 0,
+              daysSinceCreated: dayjs().diff(dayjs(l.createdAt), "day"),
+            }).total,
+          ])
+        )
+      : null;
+
   const sorted = [...filtered].sort((a, b) => {
     const mult = sortDir === "asc" ? 1 : -1;
     switch (sortKey) {
@@ -84,23 +100,8 @@ export function LeadsPageClient() {
         return mult * a.status.localeCompare(b.status);
       case "value":
         return mult * (a.value - b.value);
-      case "score": {
-        const sa = computeLeadScoreBreakdown({
-          value: a.value,
-          status: a.status,
-          activitiesCount: 0,
-          tasksCount: 0,
-          daysSinceCreated: dayjs().diff(dayjs(a.createdAt), "day"),
-        }).total;
-        const sb = computeLeadScoreBreakdown({
-          value: b.value,
-          status: b.status,
-          activitiesCount: 0,
-          tasksCount: 0,
-          daysSinceCreated: dayjs().diff(dayjs(b.createdAt), "day"),
-        }).total;
-        return mult * (sa - sb);
-      }
+      case "score":
+        return mult * ((scoreMap?.get(a.id) ?? 0) - (scoreMap?.get(b.id) ?? 0));
       case "createdAt":
         return (
           mult * (dayjs(a.createdAt).valueOf() - dayjs(b.createdAt).valueOf())

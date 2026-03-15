@@ -43,39 +43,32 @@ export async function getDashboardStats(opts?: { from?: string; to?: string }) {
   await getUser();
 
   const dateFilter = getDateFilter(opts);
-
-  const [totalResult] = await db
-    .select({ count: count() })
-    .from(lead)
-    .where(dateFilter ?? sql`1 = 1`);
-
-  const [convertedResult] = await db
-    .select({ count: count() })
-    .from(lead)
-    .where(
-      dateFilter
-        ? and(eq(lead.status, "converted"), dateFilter)
-        : eq(lead.status, "converted")
-    );
-
-  const [revenueResult] = await db
-    .select({ total: sum(lead.value) })
-    .from(lead)
-    .where(
-      dateFilter
-        ? and(eq(lead.status, "converted"), dateFilter)
-        : eq(lead.status, "converted")
-    );
+  const convertedWhere = dateFilter
+    ? and(eq(lead.status, "converted"), dateFilter)
+    : eq(lead.status, "converted");
 
   const qualifiedStatuses = ["interested", "demo", "negotiating", "converted"];
   const qualifiedWhere = sql`${lead.status} IN (${sql.join(
     qualifiedStatuses.map((s) => sql`${s}`),
     sql`, `
   )})`;
-  const [qualifiedResult] = await db
-    .select({ count: count() })
-    .from(lead)
-    .where(dateFilter ? and(qualifiedWhere, dateFilter) : qualifiedWhere);
+
+  const [[totalResult], [convertedResult], [revenueResult], [qualifiedResult]] =
+    await Promise.all([
+      db
+        .select({ count: count() })
+        .from(lead)
+        .where(dateFilter ?? sql`1 = 1`),
+      db.select({ count: count() }).from(lead).where(convertedWhere),
+      db
+        .select({ total: sum(lead.value) })
+        .from(lead)
+        .where(convertedWhere),
+      db
+        .select({ count: count() })
+        .from(lead)
+        .where(dateFilter ? and(qualifiedWhere, dateFilter) : qualifiedWhere),
+    ]);
 
   const total = totalResult?.count ?? 0;
   const converted = convertedResult?.count ?? 0;
@@ -138,6 +131,8 @@ export async function getPipelineCounts(opts?: { from?: string; to?: string }) {
 export async function getPipelineVelocity() {
   await getUser();
 
+  const ninetyDaysAgo = dayjs().subtract(90, "day").toDate();
+
   const statusChanges = await db
     .select({
       leadId: activity.leadId,
@@ -145,7 +140,12 @@ export async function getPipelineVelocity() {
       createdAt: activity.createdAt,
     })
     .from(activity)
-    .where(eq(activity.type, "status_change"))
+    .where(
+      and(
+        eq(activity.type, "status_change"),
+        gte(activity.createdAt, ninetyDaysAgo)
+      )
+    )
     .orderBy(asc(activity.createdAt));
 
   const stageDurations: Record<string, number[]> = {};
@@ -208,68 +208,56 @@ export async function getStatusChangeHistory(opts?: {
   if (opts?.to) {
     conditions.push(lte(activity.createdAt, dayjs(opts.to).toDate()));
   }
+  if (opts?.fromStatus) {
+    conditions.push(
+      sql`${activity.metadata}->>'oldStatus' = ${opts.fromStatus}`
+    );
+  }
+  if (opts?.toStatus) {
+    conditions.push(sql`${activity.metadata}->>'newStatus' = ${opts.toStatus}`);
+  }
 
-  const rows = await db.query.activity.findMany({
+  return db.query.activity.findMany({
     where: and(...conditions),
     orderBy: [desc(activity.createdAt)],
     limit: 200,
     with: { lead: true, user: true },
   });
-
-  // Filter by status transition if specified
-  let filtered = rows;
-  if (opts?.fromStatus || opts?.toStatus) {
-    filtered = rows.filter((r) => {
-      const meta = r.metadata as {
-        oldStatus?: string;
-        newStatus?: string;
-      } | null;
-      if (opts?.fromStatus && meta?.oldStatus !== opts.fromStatus) {
-        return false;
-      }
-      if (opts?.toStatus && meta?.newStatus !== opts.toStatus) {
-        return false;
-      }
-      return true;
-    });
-  }
-
-  return filtered;
 }
 
 export async function getReportingData() {
   await getUser();
 
-  const bySource = await db
-    .select({ source: lead.source, count: count() })
-    .from(lead)
-    .groupBy(lead.source);
-
   const sixMonthsAgo = dayjs().subtract(6, "month").toDate();
 
-  const monthlyLeads = await db
-    .select({
-      month: sql<string>`to_char(${lead.createdAt}, 'YYYY-MM')`,
-      count: count(),
-    })
-    .from(lead)
-    .where(gte(lead.createdAt, sixMonthsAgo))
-    .groupBy(sql`to_char(${lead.createdAt}, 'YYYY-MM')`)
-    .orderBy(sql`to_char(${lead.createdAt}, 'YYYY-MM')`);
-
-  const convBySource = await db
-    .select({
-      source: lead.source,
-      total: count(),
-      converted: sql<number>`count(*) filter (where ${lead.status} = 'converted')`,
-    })
-    .from(lead)
-    .groupBy(lead.source);
-
-  const funnelCounts = await db
-    .select({ status: lead.status, count: count() })
-    .from(lead)
-    .groupBy(lead.status);
+  const [bySource, monthlyLeads, convBySource, funnelCounts] =
+    await Promise.all([
+      db
+        .select({ source: lead.source, count: count() })
+        .from(lead)
+        .groupBy(lead.source),
+      db
+        .select({
+          month: sql<string>`to_char(${lead.createdAt}, 'YYYY-MM')`,
+          count: count(),
+        })
+        .from(lead)
+        .where(gte(lead.createdAt, sixMonthsAgo))
+        .groupBy(sql`to_char(${lead.createdAt}, 'YYYY-MM')`)
+        .orderBy(sql`to_char(${lead.createdAt}, 'YYYY-MM')`),
+      db
+        .select({
+          source: lead.source,
+          total: count(),
+          converted: sql<number>`count(*) filter (where ${lead.status} = 'converted')`,
+        })
+        .from(lead)
+        .groupBy(lead.source),
+      db
+        .select({ status: lead.status, count: count() })
+        .from(lead)
+        .groupBy(lead.status),
+    ]);
 
   return {
     bySource: bySource.map((r) => ({ source: r.source, count: r.count })),

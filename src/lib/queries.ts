@@ -87,12 +87,13 @@ export const queryKeys = {
 // Queries
 // ---------------------------------------------------------------------------
 
-export function useLeads() {
+export function useLeads(opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.leads,
     queryFn: () => getLeads(),
     staleTime: 30 * 1000,
     refetchOnWindowFocus: true,
+    enabled: opts?.enabled ?? true,
   });
 }
 
@@ -165,7 +166,13 @@ export function useStatusChangeHistory(opts?: {
   toStatus?: string;
 }) {
   return useQuery({
-    queryKey: ["audit-trail", opts],
+    queryKey: [
+      "audit-trail",
+      opts?.from,
+      opts?.to,
+      opts?.fromStatus,
+      opts?.toStatus,
+    ],
     queryFn: () => getStatusChangeHistory(opts),
     staleTime: 2 * 60 * 1000,
   });

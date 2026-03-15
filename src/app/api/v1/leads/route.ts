@@ -55,29 +55,33 @@ export async function POST(req: Request) {
 
   const data = parsed.data;
 
-  const [row] = await db
-    .insert(lead)
-    .values({
-      name: data.name,
-      email: data.email,
-      company: data.company ?? null,
-      title: data.title ?? null,
-      phone: data.phone ?? null,
-      website: data.website ?? null,
-      source: data.source ?? "api",
-      status: data.status ?? "new",
-      value: data.value ?? 0,
-      customFields: data.customFields ?? {},
-      assignedTo: key.createdBy,
-    })
-    .returning();
+  const row = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(lead)
+      .values({
+        name: data.name,
+        email: data.email,
+        company: data.company ?? null,
+        title: data.title ?? null,
+        phone: data.phone ?? null,
+        website: data.website ?? null,
+        source: data.source ?? "api",
+        status: data.status ?? "new",
+        value: data.value ?? 0,
+        customFields: data.customFields ?? {},
+        assignedTo: key.createdBy,
+      })
+      .returning();
 
-  await db.insert(activity).values({
-    leadId: row.id,
-    userId: key.createdBy,
-    type: "status_change",
-    content: `Lead created via API (key: ${key.prefix}…)`,
-    metadata: { newStatus: "new", apiKeyId: key.id },
+    await tx.insert(activity).values({
+      leadId: inserted.id,
+      userId: key.createdBy,
+      type: "status_change",
+      content: `Lead created via API (key: ${key.prefix}…)`,
+      metadata: { newStatus: "new", apiKeyId: key.id },
+    });
+
+    return inserted;
   });
 
   return NextResponse.json(

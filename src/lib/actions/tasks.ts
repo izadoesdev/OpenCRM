@@ -141,6 +141,8 @@ async function handleCalendarFieldSync(
 export async function getTasks(opts?: {
   showCompleted?: boolean;
   userId?: string | null;
+  limit?: number;
+  offset?: number;
 }) {
   await getUser();
   const conditions: SQL[] = [];
@@ -155,6 +157,8 @@ export async function getTasks(opts?: {
   return db.query.task.findMany({
     where: conditions.length > 0 ? and(...conditions) : undefined,
     orderBy: [asc(task.dueAt)],
+    limit: opts?.limit ?? 500,
+    offset: opts?.offset,
     with: { lead: true, user: true },
   });
 }
@@ -207,31 +211,35 @@ export async function createTask(data: {
     }
   }
 
-  const [row] = await db
-    .insert(task)
-    .values({
-      leadId: data.leadId,
-      title: data.title,
-      description: data.description,
-      dueAt: data.dueAt,
-      userId: data.userId ?? currentUser.id,
-      type: data.type ?? "follow_up",
-      recurrence: data.recurrence ?? null,
-      meetingLink,
-      calendarEventId,
-    })
-    .returning();
+  const row = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(task)
+      .values({
+        leadId: data.leadId,
+        title: data.title,
+        description: data.description,
+        dueAt: data.dueAt,
+        userId: data.userId ?? currentUser.id,
+        type: data.type ?? "follow_up",
+        recurrence: data.recurrence ?? null,
+        meetingLink,
+        calendarEventId,
+      })
+      .returning();
 
-  await db.insert(activity).values({
-    leadId: data.leadId,
-    userId: currentUser.id,
-    type: "task_created",
-    content: data.title,
-    metadata: {
-      taskId: row.id,
-      taskType: data.type ?? "follow_up",
-      dueAt: data.dueAt.toISOString(),
-    },
+    await tx.insert(activity).values({
+      leadId: data.leadId,
+      userId: currentUser.id,
+      type: "task_created",
+      content: data.title,
+      metadata: {
+        taskId: inserted.id,
+        taskType: data.type ?? "follow_up",
+        dueAt: data.dueAt.toISOString(),
+      },
+    });
+
+    return inserted;
   });
 
   revalidateAll(data.leadId);
@@ -280,18 +288,22 @@ export async function completeTask(id: string) {
   if (!existing) {
     throw new Error("Task not found");
   }
-  const [row] = await db
-    .update(task)
-    .set({ completedAt: dayjs().toDate() })
-    .where(eq(task.id, id))
-    .returning();
+  const [row] = await db.transaction(async (tx) => {
+    const updated = await tx
+      .update(task)
+      .set({ completedAt: dayjs().toDate() })
+      .where(eq(task.id, id))
+      .returning();
 
-  await db.insert(activity).values({
-    leadId: existing.leadId,
-    userId: user.id,
-    type: "task_completed",
-    content: existing.title,
-    metadata: { taskId: id, taskType: existing.type },
+    await tx.insert(activity).values({
+      leadId: existing.leadId,
+      userId: user.id,
+      type: "task_completed",
+      content: existing.title,
+      metadata: { taskId: id, taskType: existing.type },
+    });
+
+    return updated;
   });
 
   if (isMeetingType(existing.type) && existing.calendarEventId) {
@@ -416,17 +428,21 @@ export async function deleteTask(id: string) {
     where: eq(task.id, id),
   });
 
-  const [row] = await db.delete(task).where(eq(task.id, id)).returning();
+  const [row] = await db.transaction(async (tx) => {
+    const deleted = await tx.delete(task).where(eq(task.id, id)).returning();
 
-  if (existing) {
-    await db.insert(activity).values({
-      leadId: existing.leadId,
-      userId: user.id,
-      type: "task_deleted",
-      content: existing.title,
-      metadata: { taskType: existing.type },
-    });
-  }
+    if (existing) {
+      await tx.insert(activity).values({
+        leadId: existing.leadId,
+        userId: user.id,
+        type: "task_deleted",
+        content: existing.title,
+        metadata: { taskType: existing.type },
+      });
+    }
+
+    return deleted;
+  });
 
   if (existing?.calendarEventId) {
     try {

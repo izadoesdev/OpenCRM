@@ -40,33 +40,37 @@ export async function GET(req: Request) {
     byUser[u.id].tasks.push(t);
   }
 
-  let sent = 0;
+  const results = await Promise.allSettled(
+    Object.entries(byUser).map(
+      async ([, { email, name, tasks: userTasks }]) => {
+        const taskLines = userTasks
+          .map((t) => {
+            const leadName = t.lead?.name ?? "Unknown";
+            const due = dayjs(t.dueAt).fromNow();
+            return `<li><strong>${t.title}</strong> — ${leadName} (due ${due})</li>`;
+          })
+          .join("\n");
 
-  for (const [, { email, name, tasks: userTasks }] of Object.entries(byUser)) {
-    const taskLines = userTasks
-      .map((t) => {
-        const leadName = t.lead?.name ?? "Unknown";
-        const due = dayjs(t.dueAt).fromNow();
-        return `<li><strong>${t.title}</strong> — ${leadName} (due ${due})</li>`;
-      })
-      .join("\n");
+        const html = `
+        <p>Hi ${name},</p>
+        <p>You have <strong>${userTasks.length}</strong> overdue task${userTasks.length === 1 ? "" : "s"}:</p>
+        <ul>${taskLines}</ul>
+        <p>Log in to OpenCRM to take action.</p>
+      `.trim();
 
-    const html = `
-      <p>Hi ${name},</p>
-      <p>You have <strong>${userTasks.length}</strong> overdue task${userTasks.length === 1 ? "" : "s"}:</p>
-      <ul>${taskLines}</ul>
-      <p>Log in to OpenCRM to take action.</p>
-    `.trim();
+        await sendEmail({
+          to: email,
+          subject: `[OpenCRM] ${userTasks.length} overdue task${userTasks.length === 1 ? "" : "s"}`,
+          body: html,
+        });
+      }
+    )
+  );
 
-    try {
-      await sendEmail({
-        to: email,
-        subject: `[OpenCRM] ${userTasks.length} overdue task${userTasks.length === 1 ? "" : "s"}`,
-        body: html,
-      });
-      sent++;
-    } catch {
-      console.error(`Failed to send digest to ${email}`);
+  const sent = results.filter((r) => r.status === "fulfilled").length;
+  for (const r of results) {
+    if (r.status === "rejected") {
+      console.error("Failed to send digest:", r.reason);
     }
   }
 

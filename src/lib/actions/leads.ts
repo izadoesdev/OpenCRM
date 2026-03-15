@@ -38,6 +38,8 @@ export async function getLeads(opts?: {
   search?: string;
   sort?: string;
   order?: "asc" | "desc";
+  limit?: number;
+  offset?: number;
 }) {
   await getUser();
   const conditions: SQL[] = [isNull(lead.archivedAt)];
@@ -60,6 +62,8 @@ export async function getLeads(opts?: {
   const rows = await db.query.lead.findMany({
     where: and(...conditions),
     orderBy: [desc(lead.createdAt)],
+    limit: opts?.limit ?? 500,
+    offset: opts?.offset,
     with: { assignedUser: true },
   });
 
@@ -73,6 +77,7 @@ export async function getLead(id: string) {
     with: {
       activities: {
         orderBy: [desc(activity.createdAt)],
+        limit: 100,
         with: { user: true },
       },
       tasks: {
@@ -102,23 +107,28 @@ export async function createLead(data: {
   customFields?: Record<string, string>;
 }) {
   const user = await getUser();
-  const [row] = await db
-    .insert(lead)
-    .values({
-      ...data,
-      source: data.source ?? "manual",
-      value: data.value ?? 0,
-      customFields: data.customFields ?? {},
-      assignedTo: user.id,
-    })
-    .returning();
 
-  await db.insert(activity).values({
-    leadId: row.id,
-    userId: user.id,
-    type: "lead_created",
-    content: `Added ${data.name}`,
-    metadata: { source: data.source ?? "manual" },
+  const row = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(lead)
+      .values({
+        ...data,
+        source: data.source ?? "manual",
+        value: data.value ?? 0,
+        customFields: data.customFields ?? {},
+        assignedTo: user.id,
+      })
+      .returning();
+
+    await tx.insert(activity).values({
+      leadId: inserted.id,
+      userId: user.id,
+      type: "lead_created",
+      content: `Added ${data.name}`,
+      metadata: { source: data.source ?? "manual" },
+    });
+
+    return inserted;
   });
 
   revalidatePath("/leads");
@@ -209,17 +219,20 @@ export async function deleteLead(id: string) {
 
 export async function bulkUpdateStatus(ids: string[], status: string) {
   const user = await getUser();
-  await db.update(lead).set({ status }).where(inArray(lead.id, ids));
 
-  for (const id of ids) {
-    await db.insert(activity).values({
-      leadId: id,
-      userId: user.id,
-      type: "status_change",
-      content: `Status changed to ${status}`,
-      metadata: { newStatus: status },
-    });
-  }
+  await db.transaction(async (tx) => {
+    await tx.update(lead).set({ status }).where(inArray(lead.id, ids));
+
+    await tx.insert(activity).values(
+      ids.map((id) => ({
+        leadId: id,
+        userId: user.id,
+        type: "status_change",
+        content: `Status changed to ${status}`,
+        metadata: { newStatus: status },
+      }))
+    );
+  });
 
   revalidatePath("/leads");
   revalidatePath("/pipeline");
@@ -245,11 +258,16 @@ export async function restoreLead(id: string) {
   revalidatePath("/");
 }
 
-export async function getArchivedLeads() {
+export async function getArchivedLeads(opts?: {
+  limit?: number;
+  offset?: number;
+}) {
   await getUser();
   const rows = await db.query.lead.findMany({
     where: isNotNull(lead.archivedAt),
     orderBy: [desc(lead.archivedAt)],
+    limit: opts?.limit ?? 500,
+    offset: opts?.offset,
     with: { assignedUser: true },
   });
   return rows;
@@ -283,17 +301,21 @@ export async function importLeads(
     assignedTo: user.id,
   }));
 
-  const inserted = await db.insert(lead).values(values).returning();
+  const inserted = await db.transaction(async (tx) => {
+    const rows = await tx.insert(lead).values(values).returning();
 
-  for (const row of inserted) {
-    await db.insert(activity).values({
-      leadId: row.id,
-      userId: user.id,
-      type: "status_change",
-      content: "Lead imported via CSV",
-      metadata: { newStatus: "new" },
-    });
-  }
+    await tx.insert(activity).values(
+      rows.map((row) => ({
+        leadId: row.id,
+        userId: user.id,
+        type: "status_change",
+        content: "Lead imported via CSV",
+        metadata: { newStatus: "new" },
+      }))
+    );
+
+    return rows;
+  });
 
   revalidatePath("/leads");
   revalidatePath("/pipeline");

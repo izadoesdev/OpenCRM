@@ -147,6 +147,8 @@ export const lead = pgTable(
     index("lead_archivedAt_idx").on(table.archivedAt),
     index("lead_assignedTo_idx").on(table.assignedTo),
     index("lead_email_idx").on(table.email),
+    index("lead_createdAt_idx").on(table.createdAt),
+    index("lead_archivedAt_status_idx").on(table.archivedAt, table.status),
   ]
 );
 
@@ -170,6 +172,7 @@ export const activity = pgTable(
   (table) => [
     index("activity_leadId_idx").on(table.leadId),
     index("activity_createdAt_idx").on(table.createdAt),
+    index("activity_type_idx").on(table.type),
   ]
 );
 
@@ -199,6 +202,7 @@ export const task = pgTable(
     index("task_leadId_idx").on(table.leadId),
     index("task_userId_idx").on(table.userId),
     index("task_dueAt_idx").on(table.dueAt),
+    index("task_completedAt_dueAt_idx").on(table.completedAt, table.dueAt),
   ]
 );
 

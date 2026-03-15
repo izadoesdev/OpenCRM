@@ -36,7 +36,7 @@ const NAV_ITEMS = [
 export function CommandMenu() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const { data: leads = [] } = useLeads();
+  const { data: leads = [] } = useLeads({ enabled: open });
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {

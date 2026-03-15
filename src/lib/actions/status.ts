@@ -61,15 +61,17 @@ export async function changeLeadStatus(
     updates.churnedAt = dayjs().toDate();
   }
 
-  await db.update(lead).set(updates).where(eq(lead.id, leadId));
+  await db.transaction(async (tx) => {
+    await tx.update(lead).set(updates).where(eq(lead.id, leadId));
 
-  await db.insert(activity).values({
-    leadId,
-    userId: user.id,
-    type: "status_change",
-    content:
-      opts?.note ?? `Status changed from ${existing.status} to ${newStatus}`,
-    metadata: { oldStatus: existing.status, newStatus },
+    await tx.insert(activity).values({
+      leadId,
+      userId: user.id,
+      type: "status_change",
+      content:
+        opts?.note ?? `Status changed from ${existing.status} to ${newStatus}`,
+      metadata: { oldStatus: existing.status, newStatus },
+    });
   });
 
   let suggestedTask: SuggestedTask | null = null;
