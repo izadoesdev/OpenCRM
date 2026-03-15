@@ -14,7 +14,7 @@ export default function ErrorPage({
   return (
     <div className="flex min-h-svh items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm space-y-6 text-center">
-        <div className="mx-auto flex size-12 items-center justify-center rounded-sm bg-destructive/15">
+        <div className="mx-auto flex size-12 items-center justify-center rounded-md bg-destructive/15">
           <HugeiconsIcon
             className="text-destructive"
             icon={Alert01Icon}

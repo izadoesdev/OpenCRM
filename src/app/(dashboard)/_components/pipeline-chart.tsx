@@ -8,6 +8,7 @@ import {
   STATUS_LABELS,
   STATUS_TEXT_COLORS,
 } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 const ACTIVE_STATUSES = LEAD_STATUSES.filter(
   (s) => s !== "converted" && s !== "lost" && s !== "churned"
@@ -32,7 +33,7 @@ export function PipelineChart({ counts }: { counts: Record<string, number> }) {
           const pct = maxCount > 0 ? (c / maxCount) * 100 : 0;
           return (
             <Link
-              className="group flex items-center gap-3 rounded-sm px-1 py-1 transition-colors hover:bg-muted/40"
+              className="group flex items-center gap-3 rounded-md px-1 py-1 transition-colors hover:bg-muted/40"
               href={`/leads?status=${status}`}
               key={status}
             >
@@ -41,7 +42,11 @@ export function PipelineChart({ counts }: { counts: Record<string, number> }) {
               </span>
               <div className="flex-1 rounded-full bg-muted/50">
                 <div
-                  className={`h-1.5 rounded-full transition-all duration-300 ${STATUS_DOT_COLORS[status]} ${c === 0 ? "opacity-20" : ""}`}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all duration-300",
+                    STATUS_DOT_COLORS[status],
+                    c === 0 && "opacity-20"
+                  )}
                   style={{ width: `${Math.max(pct, 4)}%` }}
                 />
               </div>

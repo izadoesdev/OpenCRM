@@ -27,6 +27,7 @@ import {
   useLeads,
 } from "@/lib/queries";
 import { computeLeadScoreBreakdown } from "@/lib/scoring";
+import { cn } from "@/lib/utils";
 import { BulkActionsBar } from "./_components/bulk-actions-bar";
 import { CsvImportDialog } from "./_components/csv-import-dialog";
 import { LeadPreviewPanel } from "./_components/lead-preview-panel";
@@ -256,7 +257,12 @@ export function LeadsPageClient() {
 
           <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
             <button
-              className={`rounded-md px-2.5 py-1 font-medium text-xs transition-all ${statusFilter === "all" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              className={cn(
+                "rounded-md px-2.5 py-1 font-medium text-xs transition-all",
+                statusFilter === "all"
+                  ? "bg-background text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
               onClick={() => setStatusFilter("all")}
               type="button"
             >
@@ -267,7 +273,12 @@ export function LeadsPageClient() {
             </button>
             {ACTIVE_LEAD_STATUSES.map((s) => (
               <button
-                className={`rounded-md px-2.5 py-1 font-medium text-xs transition-all ${statusFilter === s ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                className={cn(
+                  "rounded-md px-2.5 py-1 font-medium text-xs transition-all",
+                  statusFilter === s
+                    ? "bg-background text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
                 key={s}
                 onClick={() => setStatusFilter(s)}
                 type="button"

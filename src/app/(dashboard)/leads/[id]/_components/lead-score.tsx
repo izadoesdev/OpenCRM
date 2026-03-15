@@ -10,6 +10,7 @@ import {
   getScoreColor,
   type ScoreBreakdown,
 } from "@/lib/scoring";
+import { cn } from "@/lib/utils";
 
 function scoreBarColor(score: number): string {
   if (score >= 70) {
@@ -28,7 +29,10 @@ export function ScoreHoverCard({ breakdown }: { breakdown: ScoreBreakdown }) {
       <HoverCardTrigger
         render={
           <button
-            className={`cursor-default rounded-sm px-2 py-0.5 font-mono text-xs ${getScoreBgColor(total)}`}
+            className={cn(
+              "cursor-default rounded-md px-2 py-0.5 font-mono text-xs",
+              getScoreBgColor(total)
+            )}
             type="button"
           />
         }
@@ -40,7 +44,10 @@ export function ScoreHoverCard({ breakdown }: { breakdown: ScoreBreakdown }) {
           <div className="flex items-center justify-between">
             <span className="font-medium text-sm">Lead Score</span>
             <span
-              className={`font-mono font-semibold text-lg ${getScoreColor(total)}`}
+              className={cn(
+                "font-mono font-semibold text-lg",
+                getScoreColor(total)
+              )}
             >
               {total}
               <span className="ml-1 font-normal text-muted-foreground text-xs">
@@ -50,7 +57,10 @@ export function ScoreHoverCard({ breakdown }: { breakdown: ScoreBreakdown }) {
           </div>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className={`h-full rounded-full transition-all ${scoreBarColor(total)}`}
+              className={cn(
+                "h-full rounded-full transition-all",
+                scoreBarColor(total)
+              )}
               style={{ width: `${total}%` }}
             />
           </div>

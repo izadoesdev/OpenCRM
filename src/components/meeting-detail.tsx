@@ -14,6 +14,7 @@ import { SectionHeader, UserAvatar } from "@/components/micro";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAddTaskAttendees, useCalendarEvent } from "@/lib/queries";
+import { cn } from "@/lib/utils";
 
 const RSVP_CONFIG: Record<
   string,
@@ -122,7 +123,10 @@ export function MeetingDetail({
                     {a.email}
                   </span>
                   <span
-                    className={`flex items-center gap-0.5 text-[10px] ${rsvp.className}`}
+                    className={cn(
+                      "flex items-center gap-0.5 text-[10px]",
+                      rsvp.className
+                    )}
                   >
                     <HugeiconsIcon icon={rsvp.icon} size={10} strokeWidth={2} />
                     {rsvp.label}

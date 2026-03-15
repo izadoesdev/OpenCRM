@@ -44,6 +44,10 @@ export function AddTaskForm({
 
   const showMeetingFields = isMeetingType(type);
   const canSubmit = !!(title.trim() && dueAt && leadId);
+  const selectedLead = (
+    leads as Array<{ id: string; name: string; timezone?: string | null }>
+  ).find((l) => l.id === leadId);
+  const selectedLeadTz = selectedLead?.timezone ?? null;
 
   useEffect(() => {
     if (type !== "follow_up" && type !== "call") {
@@ -71,7 +75,7 @@ export function AddTaskForm({
   }
 
   return (
-    <div className="mx-auto mb-6 max-w-2xl rounded-xl border bg-background">
+    <div className="mb-6 max-w-2xl rounded-xl border bg-background">
       <div className="flex items-center justify-between border-b px-5 py-3">
         <h3 className="font-semibold text-[13px]">New task</h3>
         <button
@@ -105,11 +109,7 @@ export function AddTaskForm({
           <Select onValueChange={(v) => v && setLeadId(v)} value={leadId}>
             <SelectTrigger className="w-full text-xs">
               <span className="flex-1 truncate text-left">
-                {leadId
-                  ? ((leads as Array<{ id: string; name: string }>).find(
-                      (l) => l.id === leadId
-                    )?.name ?? "Select lead…")
-                  : "Select lead…"}
+                {selectedLead?.name ?? "Select lead…"}
               </span>
             </SelectTrigger>
             <SelectContent>
@@ -124,7 +124,11 @@ export function AddTaskForm({
         </div>
 
         <div className="grid grid-cols-2 gap-2.5">
-          <DateTimePicker onChange={setDueAt} value={dueAt} />
+          <DateTimePicker
+            leadTimezone={selectedLeadTz}
+            onChange={setDueAt}
+            value={dueAt}
+          />
           <IconSelect
             displayValue={
               assignee === "_self"

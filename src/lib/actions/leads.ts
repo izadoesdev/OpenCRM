@@ -97,6 +97,8 @@ export async function createLead(data: {
   website?: string;
   source?: string;
   value?: number;
+  country?: string;
+  timezone?: string;
   customFields?: Record<string, string>;
 }) {
   const user = await getUser();
@@ -138,6 +140,8 @@ export async function updateLead(
     value: number;
     plan: string;
     assignedTo: string | null;
+    country: string;
+    timezone: string;
     customFields: Record<string, string>;
   }>
 ) {

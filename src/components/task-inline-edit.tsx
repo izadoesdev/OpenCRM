@@ -20,10 +20,12 @@ interface EditableTask {
 export function TaskInlineEdit({
   task: t,
   leadId,
+  leadTimezone,
   onClose,
 }: {
   task: EditableTask;
   leadId?: string | null;
+  leadTimezone?: string | null;
   onClose: () => void;
 }) {
   const updateTask = useUpdateTask();
@@ -76,6 +78,7 @@ export function TaskInlineEdit({
         <TaskTypePicker className="flex-1" onChange={setType} value={type} />
         <DateTimePicker
           className="flex-1"
+          leadTimezone={leadTimezone}
           onChange={(d) => setDueAt(d)}
           value={dueAt}
         />

@@ -72,3 +72,24 @@ export function getDueLabel(
 export function isMeetingType(type: string): boolean {
   return type === "meeting" || type === "demo";
 }
+
+export function getLeadLocalTime(
+  dueAt: Date,
+  leadTimezone: string | null | undefined
+): string | null {
+  if (!leadTimezone) {
+    return null;
+  }
+  return dayjs(dueAt).tz(leadTimezone).format("h:mm A");
+}
+
+export function getLeadLocalLabel(
+  leadTimezone: string | null | undefined
+): string | null {
+  if (!leadTimezone) {
+    return null;
+  }
+  const short =
+    leadTimezone.split("/").pop()?.replace(/_/g, " ") ?? leadTimezone;
+  return short;
+}

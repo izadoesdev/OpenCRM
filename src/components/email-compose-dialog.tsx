@@ -235,9 +235,9 @@ export function EmailComposeDialog({
               />
             )}
             <Button disabled={sendEmail.isPending} type="submit">
-              {sendEmail.isPending && "Sending..."}
-              {!sendEmail.isPending && sendVia === "gmail" && "Send via Gmail"}
-              {!sendEmail.isPending && sendVia !== "gmail" && "Send Email"}
+              {sendEmail.isPending
+                ? "Sending..."
+                : `Send${sendVia === "gmail" ? " via Gmail" : " Email"}`}
             </Button>
           </DialogFooter>
         </form>

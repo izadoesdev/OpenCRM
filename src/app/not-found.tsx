@@ -7,7 +7,7 @@ export default function NotFound() {
   return (
     <div className="flex min-h-svh items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm space-y-6 text-center">
-        <div className="mx-auto flex size-12 items-center justify-center rounded-sm bg-muted">
+        <div className="mx-auto flex size-12 items-center justify-center rounded-md bg-muted">
           <HugeiconsIcon
             className="text-muted-foreground"
             icon={Search01Icon}

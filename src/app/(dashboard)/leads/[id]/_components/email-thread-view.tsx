@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import type { GmailMessage } from "@/lib/actions/gmail";
 import dayjs from "@/lib/dayjs";
 import { useGoogleConnection, useSendEmail } from "@/lib/queries";
+import { cn } from "@/lib/utils";
 
 const RE_EMAIL_NAME = /^"?([^"<]+)"?\s*</;
 const RE_QUOTE_TEXT = /\r?\n\s*On .+wrote:\s*\n[\s\S]*/;
@@ -186,7 +187,7 @@ export function EmailThreadView({
             strokeWidth={1.5}
           />
           <input
-            className="h-8 w-full rounded-lg border bg-background pr-3 pl-8 text-xs outline-none transition-colors placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-ring"
+            className="h-8 w-full rounded-lg border border-input bg-background pr-3 pl-8 text-xs outline-none transition-colors placeholder:text-muted-foreground/60 focus-visible:ring-3 focus-visible:ring-ring/50"
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search emails..."
             type="text"
@@ -349,24 +350,27 @@ function EmailBubble({
   const ts = dayjs(Number(msg.internalDate));
 
   return (
-    <div className={`flex ${received ? "justify-start" : "justify-end"}`}>
-      <div className={`max-w-[88%] ${received ? "pr-6" : "pl-6"}`}>
+    <div className={cn("flex", received ? "justify-start" : "justify-end")}>
+      <div className={cn("max-w-[88%]", received ? "pr-6" : "pl-6")}>
         <button
-          className={`w-full rounded-2xl px-3.5 py-2 text-left transition-colors ${
+          className={cn(
+            "w-full rounded-2xl px-3.5 py-2 text-left transition-colors",
             received
-              ? "rounded-bl-sm bg-muted/70 hover:bg-muted"
-              : "rounded-br-sm bg-primary/10 hover:bg-primary/15"
-          } ${expanded ? "ring-1 ring-ring/30" : ""}`}
+              ? "rounded-bl-md bg-muted/70 hover:bg-muted"
+              : "rounded-br-md bg-primary/10 hover:bg-primary/15",
+            expanded && "ring-1 ring-ring/30"
+          )}
           onClick={onToggle}
           type="button"
         >
           <div className="flex items-center gap-2">
             <span
-              className={`flex size-5 shrink-0 items-center justify-center rounded-full font-bold text-[8px] ${
+              className={cn(
+                "flex size-5 shrink-0 items-center justify-center rounded-full font-bold text-[8px]",
                 received
                   ? "bg-amber-50 text-amber-700"
                   : "bg-primary/10 text-primary"
-              }`}
+              )}
             >
               {sender.charAt(0).toUpperCase()}
             </span>
@@ -499,7 +503,7 @@ function InlineCompose({
         <div className="mb-2 space-y-1.5">
           {!replyCtx && (
             <input
-              className="h-8 w-full rounded-lg border bg-background px-3 text-xs outline-none transition-colors placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-ring"
+              className="h-8 w-full rounded-lg border border-input bg-background px-3 text-xs outline-none transition-colors placeholder:text-muted-foreground/60 focus-visible:ring-3 focus-visible:ring-ring/50"
               onChange={(e) => setComposeSubject(e.target.value)}
               placeholder="Subject"
               type="text"
@@ -507,14 +511,14 @@ function InlineCompose({
             />
           )}
           <input
-            className="h-8 w-full rounded-lg border bg-background px-3 text-xs outline-none transition-colors placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-ring"
+            className="h-8 w-full rounded-lg border border-input bg-background px-3 text-xs outline-none transition-colors placeholder:text-muted-foreground/60 focus-visible:ring-3 focus-visible:ring-ring/50"
             onChange={(e) => setComposeCc(e.target.value)}
             placeholder="CC (comma-separated emails)"
             type="text"
             value={composeCc}
           />
           <input
-            className="h-8 w-full rounded-lg border bg-background px-3 text-xs outline-none transition-colors placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-ring"
+            className="h-8 w-full rounded-lg border border-input bg-background px-3 text-xs outline-none transition-colors placeholder:text-muted-foreground/60 focus-visible:ring-3 focus-visible:ring-ring/50"
             onChange={(e) => setComposeBcc(e.target.value)}
             placeholder="BCC (comma-separated emails)"
             type="text"
@@ -524,7 +528,7 @@ function InlineCompose({
       )}
       <div className="flex items-end gap-2">
         <textarea
-          className="block max-h-28 min-h-[36px] flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-xs leading-relaxed outline-none transition-colors placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-ring"
+          className="block max-h-28 min-h-[36px] flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-xs leading-relaxed outline-none transition-colors placeholder:text-muted-foreground/60 focus-visible:ring-3 focus-visible:ring-ring/50"
           onChange={(e) => setComposeBody(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -542,11 +546,12 @@ function InlineCompose({
         />
         <div className="flex shrink-0 items-center gap-1.5">
           <button
-            className={`flex size-8 items-center justify-center rounded-lg transition-colors ${
+            className={cn(
+              "flex size-8 items-center justify-center rounded-lg transition-colors",
               showExtraFields
                 ? "bg-muted text-foreground"
                 : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-            }`}
+            )}
             onClick={() => setShowExtraFields(!showExtraFields)}
             title="Subject, CC, BCC"
             type="button"

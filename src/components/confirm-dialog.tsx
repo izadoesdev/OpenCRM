@@ -19,21 +19,18 @@ type ConfirmVariant = "danger" | "warning" | "info";
 
 const VARIANT_STYLES: Record<
   ConfirmVariant,
-  { media: string; action: string; actionVariant: "destructive" | "default" }
+  { media: string; actionVariant: "destructive" | "default" }
 > = {
   danger: {
     media: "bg-red-500/10 text-red-600",
-    action: "",
     actionVariant: "destructive",
   },
   warning: {
     media: "bg-amber-500/10 text-amber-600",
-    action: "",
     actionVariant: "default",
   },
   info: {
     media: "bg-blue-500/10 text-blue-600",
-    action: "",
     actionVariant: "default",
   },
 };
@@ -112,8 +109,8 @@ export function ConfirmDialog({
 }
 
 /**
- * Hook that returns `[triggerProps, dialogElement]`.
- * Spread `triggerProps` on any button, render `dialogElement` alongside it.
+ * Hook returning `{ trigger, dialog }`.
+ * Call `trigger()` to open, render `dialog` in your JSX.
  */
 export function useConfirmDialog(
   props: Omit<ConfirmDialogProps, "open" | "onOpenChange">

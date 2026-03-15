@@ -42,7 +42,8 @@ import {
   getScoreBgColor,
   getScoreColor,
 } from "@/lib/scoring";
-import { formatCents, formatWebsite, getDueLabel } from "@/lib/utils";
+import { getShortTimezoneLabel } from "@/lib/timezones";
+import { cn, formatCents, formatWebsite, getDueLabel } from "@/lib/utils";
 
 export function LeadPreviewPanel({
   leadId,
@@ -191,6 +192,7 @@ export function LeadPreviewPanel({
               {/* ── Tasks ── */}
               <TasksSection
                 leadId={leadId}
+                leadTimezone={lead.timezone}
                 tasks={lead.tasks}
                 toggleTask={toggleTask}
               />
@@ -284,11 +286,16 @@ function ProfileSection({
       <div className="mt-3 flex items-center gap-3 text-xs">
         <div className="flex items-center gap-1.5">
           <span
-            className={`rounded-sm px-1.5 py-0.5 font-mono text-[10px] ${getScoreBgColor(bd.total)}`}
+            className={cn(
+              "rounded-md px-1.5 py-0.5 font-mono text-[10px]",
+              getScoreBgColor(bd.total)
+            )}
           >
             {bd.total}
           </span>
-          <span className={`font-mono text-[10px] ${getScoreColor(bd.total)}`}>
+          <span
+            className={cn("font-mono text-[10px]", getScoreColor(bd.total))}
+          >
             {bd.label}
           </span>
         </div>
@@ -321,6 +328,8 @@ function ContactSection({
     email: string;
     phone: string | null;
     website: string | null;
+    country: string | null;
+    timezone: string | null;
     source: string;
     createdAt: Date;
   };
@@ -354,6 +363,27 @@ function ContactSection({
           <span className="text-muted-foreground">Source</span>
           <span>{SOURCE_LABELS[lead.source] ?? lead.source}</span>
         </div>
+        {(lead.country || lead.timezone) && (
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-muted-foreground">Location</span>
+            <span>
+              {[
+                lead.country,
+                lead.timezone && getShortTimezoneLabel(lead.timezone),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </div>
+        )}
+        {lead.timezone && (
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-muted-foreground">Their time</span>
+            <span className="font-mono">
+              {dayjs().tz(lead.timezone).format("h:mm A")}
+            </span>
+          </div>
+        )}
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-muted-foreground">Added</span>
           <span>
@@ -398,10 +428,12 @@ function ContactRow({
 
 function TasksSection({
   leadId,
+  leadTimezone,
   tasks,
   toggleTask,
 }: {
   leadId: string;
+  leadTimezone?: string | null;
   tasks?: Array<{
     id: string;
     title: string;
@@ -454,8 +486,14 @@ function TasksSection({
                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                   <TaskTypeBadge type={t.type} />
                   <RecurrenceBadge recurrence={t.recurrence} />
-                  <span className={`text-[10px] ${due.className}`}>
+                  <span className={cn("text-[10px]", due.className)}>
                     {due.text}
+                    {leadTimezone && (
+                      <span className="text-muted-foreground/60">
+                        {" "}
+                        / {dayjs(t.dueAt).tz(leadTimezone).format("h:mm A")}
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>
@@ -514,7 +552,10 @@ function ActivitySection({
           const isLast = i === recent.length - 1;
           return (
             <div
-              className={`relative flex gap-2.5 pb-3 pl-5 ${isLast ? "" : "border-border/40 border-l"}`}
+              className={cn(
+                "relative flex gap-2.5 pb-3 pl-5",
+                !isLast && "border-border/40 border-l"
+              )}
               key={a.id}
               style={{ marginLeft: "7px" }}
             >

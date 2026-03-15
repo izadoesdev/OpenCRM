@@ -277,6 +277,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
             currentUserId={session?.user?.id ?? undefined}
             leadId={id}
             leadPhone={lead.phone}
+            leadTimezone={lead.timezone}
             tasks={lead.tasks}
             teamMembers={teamMembers as TeamMember[]}
           />

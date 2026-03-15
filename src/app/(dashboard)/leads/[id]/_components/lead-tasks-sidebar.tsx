@@ -33,7 +33,7 @@ import { SelectItem } from "@/components/ui/select";
 import { RECURRENCE_LABELS, TASK_RECURRENCES } from "@/lib/constants";
 import dayjs from "@/lib/dayjs";
 import { useCreateTask, useDeleteTask, useToggleTask } from "@/lib/queries";
-import { isMeetingType } from "@/lib/utils";
+import { cn, isMeetingType } from "@/lib/utils";
 
 export interface TeamMember {
   email: string;
@@ -58,12 +58,14 @@ export interface LeadTask {
 export function LeadTasksSidebar({
   leadId,
   leadPhone,
+  leadTimezone,
   tasks,
   teamMembers,
   currentUserId,
 }: {
   leadId: string;
   leadPhone?: string | null;
+  leadTimezone?: string | null;
   tasks: LeadTask[];
   teamMembers: TeamMember[];
   currentUserId?: string;
@@ -146,6 +148,7 @@ export function LeadTasksSidebar({
       {showAddTask && (
         <AddTaskForm
           createTask={createTask}
+          leadTimezone={leadTimezone}
           newTaskAssignee={newTaskAssignee}
           newTaskDue={newTaskDue}
           newTaskMeetingLink={newTaskMeetingLink}
@@ -181,6 +184,7 @@ export function LeadTasksSidebar({
               key={t.id}
               leadId={leadId}
               leadPhone={leadPhone}
+              leadTimezone={leadTimezone}
               onDelete={deleteTaskMut}
               onToggle={toggleTask}
               onToggleExpand={() =>
@@ -203,6 +207,7 @@ export function LeadTasksSidebar({
                   key={t.id}
                   leadId={leadId}
                   leadPhone={leadPhone}
+                  leadTimezone={leadTimezone}
                   onDelete={deleteTaskMut}
                   onToggle={toggleTask}
                   onToggleExpand={() =>
@@ -241,6 +246,7 @@ function AddTaskForm({
   others,
   createTask,
   setShowAddTask,
+  leadTimezone,
 }: {
   newTaskTitle: string;
   setNewTaskTitle: (v: string) => void;
@@ -262,6 +268,7 @@ function AddTaskForm({
   others: TeamMember[];
   createTask: { isPending: boolean };
   setShowAddTask: (v: boolean) => void;
+  leadTimezone?: string | null;
 }) {
   return (
     <div className="mx-5 mb-3 shrink-0 space-y-2 rounded-md border p-3">
@@ -283,7 +290,11 @@ function AddTaskForm({
           onChange={setNewTaskType}
           value={newTaskType}
         />
-        <DateTimePicker onChange={setNewTaskDue} value={newTaskDue} />
+        <DateTimePicker
+          leadTimezone={leadTimezone}
+          onChange={setNewTaskDue}
+          value={newTaskDue}
+        />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <IconSelect
@@ -364,6 +375,7 @@ function LeadTaskRow({
   task: t,
   leadId,
   leadPhone,
+  leadTimezone,
   expanded,
   onToggleExpand,
   onToggle,
@@ -372,6 +384,7 @@ function LeadTaskRow({
   task: LeadTask;
   leadId: string;
   leadPhone?: string | null;
+  leadTimezone?: string | null;
   expanded: boolean;
   onToggleExpand: () => void;
   onToggle: ReturnType<typeof useToggleTask>;
@@ -383,9 +396,10 @@ function LeadTaskRow({
 
   return (
     <div
-      className={`rounded-lg transition-colors ${
+      className={cn(
+        "rounded-lg transition-colors",
         expanded ? "bg-muted/50" : "hover:bg-muted/30"
-      }`}
+      )}
     >
       <button
         className="flex w-full cursor-pointer items-start gap-2 px-2 py-1.5 text-left"
@@ -402,7 +416,10 @@ function LeadTaskRow({
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span
-              className={`flex-1 text-sm leading-tight ${isComplete ? "text-muted-foreground line-through" : ""}`}
+              className={cn(
+                "flex-1 text-sm leading-tight",
+                isComplete && "text-muted-foreground line-through"
+              )}
             >
               {t.title}
             </span>
@@ -423,9 +440,19 @@ function LeadTaskRow({
             <TaskTypeBadge type={t.type} />
             <RecurrenceBadge recurrence={t.recurrence} />
             <span
-              className={`text-[11px] ${overdue ? "text-red-600" : "text-muted-foreground"}`}
+              className={cn(
+                "text-[11px]",
+                overdue ? "text-red-600" : "text-muted-foreground"
+              )}
             >
-              {dayjs(t.dueAt).format("h:mm A")} · {dayjs(t.dueAt).fromNow()}
+              {dayjs(t.dueAt).format("h:mm A")}
+              {leadTimezone && (
+                <span className="text-muted-foreground/60">
+                  {" "}
+                  / {dayjs(t.dueAt).tz(leadTimezone).format("h:mm A")}
+                </span>
+              )}{" "}
+              · {dayjs(t.dueAt).fromNow()}
             </span>
           </span>
         </span>
@@ -436,6 +463,7 @@ function LeadTaskRow({
           <LeadTaskDetail
             leadId={leadId}
             leadPhone={leadPhone}
+            leadTimezone={leadTimezone}
             onDelete={() => onDelete.mutate({ id: t.id, leadId })}
             task={t}
           />
@@ -464,7 +492,7 @@ function TaskQuickActions({
     <>
       {type === "call" && leadPhone && (
         <a
-          className="shrink-0 rounded-sm bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700 transition-colors hover:bg-blue-100"
+          className="shrink-0 rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700 transition-colors hover:bg-blue-100"
           href={`tel:${leadPhone}`}
           onClick={(e) => e.stopPropagation()}
         >
@@ -473,7 +501,7 @@ function TaskQuickActions({
       )}
       {type === "email" && (
         <Link
-          className="shrink-0 rounded-sm bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700 transition-colors hover:bg-violet-100"
+          className="shrink-0 rounded-md bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700 transition-colors hover:bg-violet-100"
           href={`/leads/${leadId}`}
           onClick={(e) => e.stopPropagation()}
         >
@@ -482,7 +510,7 @@ function TaskQuickActions({
       )}
       {type === "linkedin" && (
         <a
-          className="shrink-0 rounded-sm bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700 transition-colors hover:bg-sky-100"
+          className="shrink-0 rounded-md bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700 transition-colors hover:bg-sky-100"
           href="https://linkedin.com"
           onClick={(e) => e.stopPropagation()}
           rel="noopener noreferrer"
@@ -500,11 +528,13 @@ function LeadTaskDetail({
   task: t,
   leadId,
   leadPhone,
+  leadTimezone,
   onDelete,
 }: {
   task: LeadTask;
   leadId: string;
   leadPhone?: string | null;
+  leadTimezone?: string | null;
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -521,6 +551,7 @@ function LeadTaskDetail({
     return (
       <TaskInlineEdit
         leadId={leadId}
+        leadTimezone={leadTimezone}
         onClose={() => setEditing(false)}
         task={t}
       />

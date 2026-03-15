@@ -38,6 +38,7 @@ export interface TaskWithLead {
     name: string;
     status: string;
     phone?: string | null;
+    timezone?: string | null;
   } | null;
   leadId: string;
   meetingLink: string | null;
@@ -94,6 +95,7 @@ function TaskDetail({
     return (
       <TaskInlineEdit
         leadId={t.leadId}
+        leadTimezone={t.lead?.timezone}
         onClose={() => setEditing(false)}
         task={t}
       />
@@ -153,7 +155,15 @@ function TaskDetail({
             size={12}
             strokeWidth={1.5}
           />
-          <span>{dayjs(t.dueAt).format("MMM D, YYYY · h:mm A")}</span>
+          <span>
+            {dayjs(t.dueAt).format("MMM D, YYYY · h:mm A")}
+            {t.lead?.timezone && (
+              <span className="ml-1 text-muted-foreground/60">
+                ({dayjs(t.dueAt).tz(t.lead.timezone).format("h:mm A")} their
+                time)
+              </span>
+            )}
+          </span>
         </div>
       </div>
 
@@ -316,6 +326,11 @@ export function TaskRow({
             >
               <HugeiconsIcon icon={Clock01Icon} size={10} strokeWidth={1.5} />
               <span>{due.text}</span>
+              {t.lead?.timezone && !isComplete && (
+                <span className="text-muted-foreground/50">
+                  / {dayjs(t.dueAt).tz(t.lead.timezone).format("h:mm A")}
+                </span>
+              )}
             </div>
           </div>
         </div>

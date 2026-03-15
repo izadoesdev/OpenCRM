@@ -120,6 +120,8 @@ export const lead = pgTable(
     title: text("title"),
     phone: text("phone"),
     website: text("website"),
+    country: text("country"),
+    timezone: text("timezone"),
     source: text("source").notNull().default("manual"),
     status: text("status").notNull().default("new"),
     plan: text("plan"),

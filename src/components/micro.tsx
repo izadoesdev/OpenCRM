@@ -48,7 +48,7 @@ export function Pill({
   return (
     <span
       className={cn(
-        "rounded-sm px-1.5 py-0.5 font-mono text-[10px]",
+        "rounded-md px-1.5 py-0.5 font-mono text-[10px]",
         PILL_VARIANTS[variant],
         className
       )}

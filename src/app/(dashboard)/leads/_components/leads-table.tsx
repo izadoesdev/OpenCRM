@@ -40,7 +40,7 @@ import {
   getScoreBgColor,
   getScoreColor,
 } from "@/lib/scoring";
-import { formatCents } from "@/lib/utils";
+import { cn, formatCents } from "@/lib/utils";
 
 function SortableHead({
   active,
@@ -57,7 +57,10 @@ function SortableHead({
 }) {
   return (
     <TableHead
-      className={`cursor-pointer select-none text-muted-foreground text-xs transition-colors hover:text-foreground ${className ?? ""}`}
+      className={cn(
+        "cursor-pointer select-none text-muted-foreground text-xs transition-colors hover:text-foreground",
+        className
+      )}
       onClick={onClick}
     >
       <span className="inline-flex items-center gap-1">
@@ -310,7 +313,10 @@ function LeadTableRow({
             }
           >
             <span
-              className={`inline-flex items-center rounded-sm px-1.5 py-0.5 font-mono text-[10px] leading-none ${getScoreBgColor(bd.total)}`}
+              className={cn(
+                "inline-flex items-center rounded-md px-1.5 py-0.5 font-mono text-[10px] leading-none",
+                getScoreBgColor(bd.total)
+              )}
             >
               {bd.total}
             </span>
@@ -326,7 +332,10 @@ function LeadTableRow({
               <div className="flex items-center justify-between gap-4">
                 <span className="font-medium text-[10px]">Score</span>
                 <span
-                  className={`font-mono font-semibold text-xs ${getScoreColor(bd.total)}`}
+                  className={cn(
+                    "font-mono font-semibold text-xs",
+                    getScoreColor(bd.total)
+                  )}
                 >
                   {bd.total}/100
                 </span>

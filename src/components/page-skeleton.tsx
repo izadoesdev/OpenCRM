@@ -1,10 +1,9 @@
 import { PageHeader } from "@/components/page-header";
+import { cn } from "@/lib/utils";
 
 function Bone({ className }: { className?: string }) {
   return (
-    <div
-      className={`animate-pulse rounded-md bg-muted/60 ${className ?? ""}`}
-    />
+    <div className={cn("animate-pulse rounded-md bg-muted/60", className)} />
   );
 }
 
@@ -47,7 +46,10 @@ export function EmptyState({
 }) {
   return (
     <div
-      className={`flex flex-col items-center justify-center py-12 text-muted-foreground ${className ?? ""}`}
+      className={cn(
+        "flex flex-col items-center justify-center py-12 text-muted-foreground",
+        className
+      )}
     >
       {icon && <div className="mb-3 opacity-40">{icon}</div>}
       <p className="text-sm">{message}</p>

@@ -19,11 +19,11 @@ export function SegmentedControl<T extends string>({
   className?: string;
 }) {
   return (
-    <div className={cn("flex rounded-md border bg-muted/30 p-0.5", className)}>
+    <div className={cn("flex rounded-lg border bg-muted/30 p-0.5", className)}>
       {segments.map((s) => (
         <button
           className={cn(
-            "rounded-sm px-2.5 py-1 text-xs transition-all",
+            "rounded-md px-2.5 py-1 text-xs transition-all",
             value === s.value
               ? "bg-background font-medium"
               : "text-muted-foreground hover:text-foreground"

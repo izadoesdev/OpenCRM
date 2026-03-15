@@ -24,6 +24,7 @@ import {
   useCreateLead,
   useUpdateLead,
 } from "@/lib/queries";
+import { TIMEZONE_GROUPS } from "@/lib/timezones";
 
 const COMMON_TITLES = [
   "CEO",
@@ -43,11 +44,13 @@ const COMMON_TITLES = [
 
 interface LeadData {
   company?: string | null;
+  country?: string | null;
   email?: string;
   id?: string;
   name?: string;
   phone?: string | null;
   source?: string;
+  timezone?: string | null;
   title?: string | null;
   value?: number;
   website?: string | null;
@@ -75,6 +78,8 @@ export function LeadFormDialog({
   const [website, setWebsite] = useState("");
   const [source, setSource] = useState("manual");
   const [valueDollars, setValueDollars] = useState("");
+  const [country, setCountry] = useState("");
+  const [tz, setTz] = useState("");
 
   const duplicateCheck = useCheckDuplicateEmail(email);
 
@@ -88,6 +93,8 @@ export function LeadFormDialog({
       setWebsite((lead?.website ?? "").replace(/^https?:\/\//, ""));
       setSource(lead?.source ?? "manual");
       setValueDollars(lead?.value ? (lead.value / 100).toString() : "");
+      setCountry(lead?.country ?? "");
+      setTz(lead?.timezone ?? "");
     }
   }, [open, lead]);
 
@@ -106,6 +113,8 @@ export function LeadFormDialog({
       website: website ? `https://${website}` : undefined,
       source,
       value: cents,
+      country: country || undefined,
+      timezone: tz || undefined,
     };
 
     if (isEdit && lead?.id) {
@@ -266,6 +275,62 @@ export function LeadFormDialog({
                   value={website}
                 />
               </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label
+                className="text-muted-foreground text-xs"
+                htmlFor="lead-country"
+              >
+                Country
+              </label>
+              <Input
+                id="lead-country"
+                onChange={(e) => setCountry(e.target.value)}
+                placeholder="United States"
+                value={country}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label
+                className="text-muted-foreground text-xs"
+                htmlFor="lead-tz"
+              >
+                Timezone
+              </label>
+              <Select
+                onValueChange={(v) => v && setTz(v)}
+                value={tz || undefined}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select timezone..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIMEZONE_GROUPS.map((g) => (
+                    <SelectItem
+                      disabled
+                      key={g.region}
+                      value={`__group_${g.region}`}
+                    >
+                      <span className="font-medium text-[10px] text-muted-foreground uppercase tracking-wider">
+                        {g.region}
+                      </span>
+                    </SelectItem>
+                  )).flatMap((groupHeader, gi) => [
+                    groupHeader,
+                    ...TIMEZONE_GROUPS[gi].zones.map((z) => (
+                      <SelectItem key={z.value} value={z.value}>
+                        {z.label}
+                        <span className="ml-1 text-[10px] text-muted-foreground">
+                          {z.offset}
+                        </span>
+                      </SelectItem>
+                    )),
+                  ])}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

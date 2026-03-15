@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { SOURCE_LABELS } from "@/lib/constants";
 import dayjs from "@/lib/dayjs";
 import type { useAssignLead, useUpdateLead } from "@/lib/queries";
+import { getTimezoneLabel } from "@/lib/timezones";
 import { formatCents, formatWebsite } from "@/lib/utils";
 import type { TeamMember } from "./lead-tasks-sidebar";
 
@@ -69,6 +70,8 @@ export function DetailsSidebar({
     email: string;
     phone: string | null;
     website: string | null;
+    country: string | null;
+    timezone: string | null;
     source: string;
     value: number;
     plan: string | null;
@@ -111,6 +114,22 @@ export function DetailsSidebar({
         <DetailField label="Source">
           {SOURCE_LABELS[lead.source] ?? lead.source}
         </DetailField>
+        {(lead.country || lead.timezone) && (
+          <DetailField label="Location">
+            <span className="text-sm">
+              {[lead.country, lead.timezone && getTimezoneLabel(lead.timezone)]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </DetailField>
+        )}
+        {lead.timezone && (
+          <DetailField label="Their time">
+            <span className="font-mono text-xs">
+              {dayjs().tz(lead.timezone).format("h:mm A")}
+            </span>
+          </DetailField>
+        )}
         {lead.value > 0 && (
           <DetailField label="Value">
             <span className="font-mono">{formatCents(lead.value)}</span>

@@ -9,7 +9,7 @@ import { RecurrenceBadge, TaskTypeBadge } from "@/components/task-type-picker";
 import { Button } from "@/components/ui/button";
 import dayjs from "@/lib/dayjs";
 import type { useToggleTask } from "@/lib/queries";
-import { getDueLabel } from "@/lib/utils";
+import { cn, getDueLabel } from "@/lib/utils";
 
 export interface DashTaskItem {
   completedAt: Date | null;
@@ -140,7 +140,10 @@ function DashboardTaskRow({
       </span>
       <div className="min-w-0 flex-1">
         <p
-          className={`text-sm leading-tight ${isComplete ? "text-muted-foreground line-through" : ""}`}
+          className={cn(
+            "text-sm leading-tight",
+            isComplete && "text-muted-foreground line-through"
+          )}
         >
           {t.title}
         </p>
@@ -150,7 +153,7 @@ function DashboardTaskRow({
           )}
           <TaskTypeBadge type={t.type} />
           <RecurrenceBadge recurrence={t.recurrence} />
-          <span className={`text-[11px] ${due.className}`}>{due.text}</span>
+          <span className={cn("text-[11px]", due.className)}>{due.text}</span>
         </div>
       </div>
       {t.meetingLink && (

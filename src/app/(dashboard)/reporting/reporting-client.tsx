@@ -11,6 +11,7 @@ import {
   STATUS_TEXT_COLORS,
 } from "@/lib/constants";
 import { usePipelineVelocity, useReportingData } from "@/lib/queries";
+import { cn } from "@/lib/utils";
 import {
   FunnelRow,
   MetricRow,
@@ -228,7 +229,10 @@ export function ReportingClient() {
                         </span>
                         <div className="h-1.5 flex-1 rounded-full bg-muted/50">
                           <div
-                            className={`h-full rounded-full transition-all duration-500 ${convBarColor(s.rate)}`}
+                            className={cn(
+                              "h-full rounded-full transition-all duration-500",
+                              convBarColor(s.rate)
+                            )}
                             style={{
                               width: `${Math.max(s.rate, 2)}%`,
                               minWidth: s.rate > 0 ? "6px" : undefined,
@@ -263,7 +267,10 @@ export function ReportingClient() {
                           </span>
                           <div className="flex items-baseline gap-2">
                             <span
-                              className={`font-mono font-semibold text-sm ${STATUS_TEXT_COLORS[s] ?? ""}`}
+                              className={cn(
+                                "font-mono font-semibold text-sm",
+                                STATUS_TEXT_COLORS[s]
+                              )}
                             >
                               {v.avg}d
                             </span>

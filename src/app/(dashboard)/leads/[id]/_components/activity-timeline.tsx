@@ -308,7 +308,7 @@ function StatusChangePill({ status }: { status: string }) {
   return (
     <span
       className={cn(
-        "inline-flex rounded-sm px-1.5 py-0.5 font-medium text-[10px] uppercase tracking-wider",
+        "inline-flex rounded-md px-1.5 py-0.5 font-medium text-[10px] uppercase tracking-wider",
         STATUS_COLORS[status] ?? "bg-muted text-muted-foreground"
       )}
     >
@@ -363,7 +363,7 @@ function TaskActivityContent({
       <p className="text-[13px]">{content}</p>
       <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
         {taskType && (
-          <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
             {TASK_TYPE_LABELS[taskType] ?? taskType}
           </span>
         )}
@@ -384,7 +384,7 @@ function AssignmentContent({ meta }: { meta: Record<string, unknown> }) {
     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px]">
       {prev && (
         <>
-          <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px]">
+          <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px]">
             {prev}
           </span>
           <HugeiconsIcon
@@ -396,7 +396,7 @@ function AssignmentContent({ meta }: { meta: Record<string, unknown> }) {
         </>
       )}
       {next ? (
-        <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px]">
+        <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px]">
           {next}
         </span>
       ) : (
@@ -424,7 +424,7 @@ function ActivityContent({
       <div className="mt-1">
         <p className="text-[13px]">{content}</p>
         {source && (
-          <span className="mt-0.5 inline-block rounded-sm bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          <span className="mt-0.5 inline-block rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
             via {source}
           </span>
         )}
