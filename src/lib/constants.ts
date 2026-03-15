@@ -115,6 +115,38 @@ export const STATUS_TEXT_COLORS: Record<string, string> = {
   churned: "text-zinc-500",
 };
 
+// ── Finances ──
+
+export const EXPENSE_TYPES = ["subscription", "payroll", "one_time"] as const;
+
+export type ExpenseType = (typeof EXPENSE_TYPES)[number];
+
+export const EXPENSE_TYPE_LABELS: Record<string, string> = {
+  subscription: "Subscription",
+  payroll: "Payroll",
+  one_time: "One-time",
+};
+
+export const BILLING_PERIODS = ["monthly", "yearly"] as const;
+
+export type BillingPeriod = (typeof BILLING_PERIODS)[number];
+
+export const BILLING_PERIOD_LABELS: Record<string, string> = {
+  monthly: "Monthly",
+  yearly: "Yearly",
+};
+
+export const EXPENSE_CATEGORIES = [
+  "Infrastructure",
+  "Tools",
+  "Marketing",
+  "Legal",
+  "Finance",
+  "Office",
+  "Payroll",
+  "Other",
+] as const;
+
 export const TASK_RECURRENCES = [
   "daily",
   "weekly",

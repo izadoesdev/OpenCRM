@@ -46,6 +46,7 @@ import { ActivityTimeline } from "./_components/activity-timeline";
 import {
   AssignedToSection,
   DetailsSidebar,
+  LeadExpensesSection,
 } from "./_components/details-sidebar";
 import { EmailThreadView } from "./_components/email-thread-view";
 import {
@@ -273,6 +274,7 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
             leadId={id}
             teamMembers={teamMembers as TeamMember[]}
           />
+          <LeadExpensesSection leadId={id} />
           <LeadTasksSidebar
             currentUserId={session?.user?.id ?? undefined}
             leadId={id}

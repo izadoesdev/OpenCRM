@@ -68,6 +68,15 @@ import {
   exportLeads,
   exportTasks,
 } from "./actions/data-export";
+import {
+  createExpense,
+  deleteExpense,
+  getExpenses,
+  getFinancialOverview,
+  getLeadExpenses,
+  updateExpense,
+  updateFinancialSnapshot,
+} from "./actions/finances";
 import { getLeadEmails } from "./actions/gmail";
 import {
   disconnectGoogle,
@@ -104,6 +113,9 @@ export const queryKeys = {
   profile: ["profile"] as const,
   appSettings: ["app-settings"] as const,
   webhooks: ["webhooks"] as const,
+  finances: ["finances"] as const,
+  financialOverview: ["financial-overview"] as const,
+  leadExpenses: (id: string) => ["lead-expenses", id] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -1197,4 +1209,112 @@ export function useExportTasks() {
 
 export function useExportActivities() {
   return useMutation({ mutationFn: () => exportActivities() });
+}
+
+// ---------------------------------------------------------------------------
+// Finances
+// ---------------------------------------------------------------------------
+
+export function useFinancialOverview() {
+  return useQuery({
+    queryKey: queryKeys.financialOverview,
+    queryFn: () => getFinancialOverview(),
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useExpenses() {
+  return useQuery({
+    queryKey: queryKeys.finances,
+    queryFn: () => getExpenses(),
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useLeadExpenses(leadId: string) {
+  return useQuery({
+    queryKey: queryKeys.leadExpenses(leadId),
+    queryFn: () => getLeadExpenses(leadId),
+    staleTime: 30 * 1000,
+  });
+}
+
+function useInvalidateFinances() {
+  const qc = useQueryClient();
+  return () => {
+    qc.invalidateQueries({ queryKey: queryKeys.finances });
+    qc.invalidateQueries({ queryKey: queryKeys.financialOverview });
+  };
+}
+
+export function useCreateExpense() {
+  const inv = useInvalidateFinances();
+  return useMutation({
+    mutationFn: createExpense,
+    onSuccess: () => {
+      inv();
+      toast.success("Expense added");
+    },
+    onError: () => toast.error("Failed to add expense"),
+  });
+}
+
+export function useUpdateExpense() {
+  const inv = useInvalidateFinances();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: Parameters<typeof updateExpense>[1];
+    }) => updateExpense(id, data),
+    onSuccess: () => {
+      inv();
+      toast.success("Expense updated");
+    },
+    onError: () => toast.error("Failed to update expense"),
+  });
+}
+
+export function useDeleteExpense() {
+  const qc = useQueryClient();
+  const inv = useInvalidateFinances();
+  return useMutation({
+    mutationFn: deleteExpense,
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: queryKeys.finances });
+      const prev = qc.getQueryData(queryKeys.finances);
+      qc.setQueryData(
+        queryKeys.finances,
+        (old: Array<{ id: string }> | undefined) =>
+          old?.filter((e) => e.id !== id)
+      );
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev) {
+        qc.setQueryData(queryKeys.finances, ctx.prev);
+      }
+      toast.error("Failed to delete expense");
+    },
+    onSuccess: () => {
+      inv();
+      toast.success("Expense deleted");
+    },
+  });
+}
+
+export function useUpdateFinancialSnapshot() {
+  const inv = useInvalidateFinances();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof updateFinancialSnapshot>[0]) =>
+      updateFinancialSnapshot(data),
+    onSuccess: () => {
+      inv();
+      toast.success("Financials updated");
+    },
+    onError: () => toast.error("Failed to update financials"),
+  });
 }

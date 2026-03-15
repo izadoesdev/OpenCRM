@@ -280,6 +280,56 @@ export const webhook = pgTable(
   (table) => [index("webhook_createdBy_idx").on(table.createdBy)]
 );
 
+// ── Finances ──
+
+export const expense = pgTable(
+  "expense",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull(),
+    type: text("type").notNull(), // "subscription" | "one_time" | "payroll"
+    amountCents: integer("amount_cents").notNull(),
+    billingPeriod: text("billing_period"), // "monthly" | "yearly" | null
+    category: text("category"),
+    userId: text("user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    leadId: text("lead_id").references(() => lead.id, {
+      onDelete: "set null",
+    }),
+    activeFrom: timestamp("active_from"),
+    activeTo: timestamp("active_to"),
+    paidAt: timestamp("paid_at"),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("expense_type_idx").on(table.type),
+    index("expense_createdBy_idx").on(table.createdBy),
+    index("expense_leadId_idx").on(table.leadId),
+  ]
+);
+
+export const financialSnapshot = pgTable("financial_snapshot", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => "default"),
+  cashOnHandCents: integer("cash_on_hand_cents").notNull().default(0),
+  mrrAdjustmentCents: integer("mrr_adjustment_cents").notNull().default(0),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
+
 // ── Relations ──
 
 export const userRelations = relations(user, ({ many }) => ({
@@ -289,6 +339,7 @@ export const userRelations = relations(user, ({ many }) => ({
   activities: many(activity),
   tasks: many(task),
   apiKeys: many(apiKey),
+  expenses: many(expense),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -312,6 +363,7 @@ export const leadRelations = relations(lead, ({ one, many }) => ({
   }),
   activities: many(activity),
   tasks: many(task),
+  expenses: many(expense),
 }));
 
 export const activityRelations = relations(activity, ({ one }) => ({
@@ -354,5 +406,16 @@ export const webhookRelations = relations(webhook, ({ one }) => ({
   creator: one(user, {
     fields: [webhook.createdBy],
     references: [user.id],
+  }),
+}));
+
+export const expenseRelations = relations(expense, ({ one }) => ({
+  creator: one(user, {
+    fields: [expense.createdBy],
+    references: [user.id],
+  }),
+  lead: one(lead, {
+    fields: [expense.leadId],
+    references: [lead.id],
   }),
 }));

@@ -3,6 +3,7 @@
 import {
   Contact01Icon,
   DashboardBrowsingIcon,
+  DollarCircleIcon,
   FilterIcon,
   Logout01Icon,
   PresentationBarChart01Icon,
@@ -50,6 +51,7 @@ const SECONDARY_NAV = [
     href: "/reporting",
     icon: PresentationBarChart01Icon,
   },
+  { title: "Finances", href: "/finances", icon: DollarCircleIcon },
   { title: "Settings", href: "/settings", icon: Settings01Icon },
 ];
 

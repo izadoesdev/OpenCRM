@@ -1,10 +1,12 @@
 import {
   CallIcon,
+  DollarCircleIcon,
   Globe02Icon,
   Mail01Icon,
   UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import Link from "next/link";
 import {
   DetailField,
   Pill,
@@ -20,11 +22,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { SOURCE_LABELS } from "@/lib/constants";
+import { EXPENSE_TYPE_LABELS, SOURCE_LABELS } from "@/lib/constants";
 import dayjs from "@/lib/dayjs";
 import {
   type useAssignLead,
   useFormatCents,
+  useLeadExpenses,
   type useUpdateLead,
 } from "@/lib/queries";
 import { getTimezoneLabel } from "@/lib/timezones";
@@ -310,6 +313,52 @@ export function AssignedToSection({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+    </div>
+  );
+}
+
+function fmtCentsShort(cents: number) {
+  return `$${(cents / 100).toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+export function LeadExpensesSection({ leadId }: { leadId: string }) {
+  const { data: expenses } = useLeadExpenses(leadId);
+  if (!expenses || expenses.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="shrink-0 border-b px-5 py-4">
+      <SectionHeader>
+        <div className="flex items-center gap-1.5">
+          <HugeiconsIcon icon={DollarCircleIcon} size={13} strokeWidth={1.5} />
+          Expenses
+        </div>
+      </SectionHeader>
+      <div className="space-y-1.5">
+        {expenses.map((e) => (
+          <div className="flex items-center justify-between text-sm" key={e.id}>
+            <span className="truncate text-[13px]">{e.name}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs tabular-nums">
+                {fmtCentsShort(e.amountCents)}
+              </span>
+              <Pill variant="muted">
+                {EXPENSE_TYPE_LABELS[e.type] ?? e.type}
+              </Pill>
+            </div>
+          </div>
+        ))}
+        <Link
+          className="mt-1 block text-muted-foreground text-xs hover:text-foreground"
+          href="/finances"
+        >
+          View all finances &rarr;
+        </Link>
+      </div>
     </div>
   );
 }
