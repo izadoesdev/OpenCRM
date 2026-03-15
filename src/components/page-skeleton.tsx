@@ -1,3 +1,4 @@
+import { motion } from "motion/react";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
 
@@ -45,14 +46,17 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div
+    <motion.div
+      animate={{ opacity: 1, scale: 1 }}
       className={cn(
         "flex flex-col items-center justify-center py-12 text-muted-foreground",
         className
       )}
+      initial={{ opacity: 0, scale: 0.97 }}
+      transition={{ duration: 0.3 }}
     >
       {icon && <div className="mb-3 opacity-40">{icon}</div>}
       <p className="text-sm">{message}</p>
-    </div>
+    </motion.div>
   );
 }
