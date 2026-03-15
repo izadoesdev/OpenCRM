@@ -44,7 +44,7 @@ export function ActivityLog() {
       }
       title="Activity Log"
     >
-      <div className="max-h-80 space-y-px overflow-y-auto">
+      <div className="max-h-64 space-y-px overflow-y-auto">
         {entries && entries.length === 0 && (
           <ReportingEmpty message="No status changes in this period" />
         )}
@@ -55,21 +55,23 @@ export function ActivityLog() {
           } | null;
           return (
             <div
-              className="flex items-center gap-3 rounded-lg px-2 py-2 text-[13px] transition-colors hover:bg-muted/30"
+              className="flex items-center gap-2 rounded px-1.5 py-1 text-xs transition-colors hover:bg-muted/20"
               key={entry.id}
             >
-              <span className="w-14 shrink-0 font-mono text-[11px] text-muted-foreground tabular-nums">
+              <span className="w-12 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">
                 {dayjs(entry.createdAt).format("MMM D")}
               </span>
               {entry.lead && (
-                <span className="min-w-0 flex-1 truncate font-medium text-[13px]">
+                <span className="min-w-0 flex-1 truncate font-medium text-[11px]">
                   {entry.lead.name}
                 </span>
               )}
-              <div className="flex shrink-0 items-center gap-1.5">
+              <div className="flex shrink-0 items-center gap-1">
                 {meta?.oldStatus && <StatusBadge status={meta.oldStatus} />}
                 {meta?.oldStatus && meta?.newStatus && (
-                  <span className="text-muted-foreground/40">→</span>
+                  <span className="text-[10px] text-muted-foreground/40">
+                    →
+                  </span>
                 )}
                 {meta?.newStatus && <StatusBadge status={meta.newStatus} />}
               </div>

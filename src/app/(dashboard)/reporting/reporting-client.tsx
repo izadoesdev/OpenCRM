@@ -17,7 +17,6 @@ import {
   MetricRow,
   ReportingCard,
   ReportingEmpty,
-  StatCard,
 } from "./_components/reporting-primitives";
 import { ActivityLog } from "./_sections/activity-log";
 
@@ -41,6 +40,27 @@ function convVariant(rate: number): "success" | "primary" | "muted" {
   return "muted";
 }
 
+function Stat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  accent?: string;
+}) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span
+        className={`font-mono font-semibold text-sm tabular-nums ${accent ?? ""}`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
 export function ReportingClient() {
   const { data, isLoading } = useReportingData();
   const { data: velocity } = usePipelineVelocity();
@@ -53,10 +73,14 @@ export function ReportingClient() {
   for (const f of data.funnelCounts) {
     funnelMap[f.status] = f.count;
   }
+
   const totalLeads = Object.values(funnelMap).reduce((a, b) => a + b, 0);
   const convertedCount = funnelMap.converted ?? 0;
+  const lostCount = funnelMap.lost ?? 0;
   const convRate =
     totalLeads > 0 ? ((convertedCount / totalLeads) * 100).toFixed(1) : "0";
+  const lossRate =
+    totalLeads > 0 ? ((lostCount / totalLeads) * 100).toFixed(0) : "0";
   const maxFunnel = Math.max(1, ...Object.values(funnelMap));
   const maxMonthly = Math.max(1, ...data.monthlyLeads.map((m) => m.count));
   const maxSource = Math.max(1, ...data.bySource.map((s) => s.count));
@@ -74,133 +98,102 @@ export function ReportingClient() {
         ).toFixed(1)
       : null;
 
+  const activeStages = ACTIVE_LEAD_STATUSES.filter(
+    (s) => !["converted", "lost"].includes(s) && (funnelMap[s] ?? 0) > 0
+  ).length;
+
   return (
     <div className="flex h-full flex-col">
       <PageHeader>
-        <div className="flex flex-1 items-center justify-between">
+        <div className="flex flex-1 items-center justify-between gap-4">
           <h1 className="font-semibold text-lg tracking-tight">Reporting</h1>
-          <div className="hidden items-center gap-4 text-xs sm:flex">
-            <span className="flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-blue-400" />
-              <span className="font-mono text-foreground">{totalLeads}</span>
-              <span className="text-muted-foreground">total</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-emerald-400" />
-              <span className="font-mono text-foreground">{convRate}%</span>
-              <span className="text-muted-foreground">conv</span>
-            </span>
+          <div className="flex items-center gap-5">
+            <Stat accent="text-blue-600" label="Leads" value={totalLeads} />
+            <Stat
+              accent="text-emerald-600"
+              label="Conv"
+              value={`${convRate}%`}
+            />
+            <Stat
+              accent="text-amber-600"
+              label="Pipeline"
+              value={activeStages}
+            />
+            <Stat accent="text-red-600" label="Lost" value={`${lossRate}%`} />
             {avgVelocity && (
-              <span className="flex items-center gap-1.5">
-                <span className="size-1.5 rounded-full bg-amber-400" />
-                <span className="font-mono text-foreground">
-                  {avgVelocity}d
-                </span>
-                <span className="text-muted-foreground">avg cycle</span>
-              </span>
+              <Stat
+                accent="text-violet-600"
+                label="Cycle"
+                value={`${avgVelocity}d`}
+              />
             )}
           </div>
         </div>
       </PageHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-muted/20">
-        <div className="mx-auto max-w-6xl space-y-5 p-5">
-          {/* ── Stat cards ── */}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard
-              accent="text-blue-600"
-              label="Total Leads"
-              value={totalLeads}
-            />
-            <StatCard
-              accent="text-emerald-600"
-              label="Converted"
-              sub={`${convRate}% conversion rate`}
-              value={convertedCount}
-            />
-            <StatCard
-              accent="text-amber-600"
-              label="In Pipeline"
-              sub="active stages"
-              value={
-                ACTIVE_LEAD_STATUSES.filter(
-                  (s) =>
-                    !["converted", "lost"].includes(s) &&
-                    (funnelMap[s] ?? 0) > 0
-                ).length
-              }
-            />
-            <StatCard
-              accent="text-red-600"
-              label="Lost"
-              sub={
-                totalLeads > 0
-                  ? `${(((funnelMap.lost ?? 0) / totalLeads) * 100).toFixed(0)}% loss rate`
-                  : undefined
-              }
-              value={funnelMap.lost ?? 0}
-            />
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex max-w-[1400px] gap-4 p-4">
+          {/* Left column */}
+          <div className="flex min-w-0 flex-1 flex-col gap-4">
+            {/* Funnel */}
+            <ReportingCard title="Pipeline Funnel">
+              <div className="space-y-px">
+                {ACTIVE_LEAD_STATUSES.map((s) => (
+                  <FunnelRow
+                    barColor={STATUS_DOT_COLORS[s]}
+                    key={s}
+                    label={STATUS_LABELS[s]}
+                    max={maxFunnel}
+                    value={funnelMap[s] ?? 0}
+                  />
+                ))}
+              </div>
+            </ReportingCard>
+
+            {/* Leads over time */}
+            <ReportingCard description="Last 6 months" title="Leads Over Time">
+              {data.monthlyLeads.length === 0 ? (
+                <ReportingEmpty message="No data yet" />
+              ) : (
+                <div className="flex items-end gap-1.5" style={{ height: 120 }}>
+                  {data.monthlyLeads.map((m) => {
+                    const barH = (m.count / maxMonthly) * 100;
+                    return (
+                      <div
+                        className="group flex flex-1 flex-col items-center justify-end gap-1"
+                        key={m.month}
+                        style={{ height: "100%" }}
+                      >
+                        <span className="font-mono text-[9px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                          {m.count}
+                        </span>
+                        <div
+                          className="w-full rounded bg-primary/15 transition-all duration-500 group-hover:bg-primary/30"
+                          style={{ height: `${Math.max(barH, 3)}%` }}
+                        />
+                        <span className="text-[9px] text-muted-foreground tabular-nums">
+                          {m.month.slice(5)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </ReportingCard>
+
+            {/* Activity log */}
+            <ActivityLog />
           </div>
 
-          {/* ── Main grid ── */}
-          <div className="grid gap-5 lg:grid-cols-5">
-            {/* Left: funnel + timeline */}
-            <div className="space-y-5 lg:col-span-3">
-              <ReportingCard title="Pipeline Funnel">
-                <div className="space-y-0.5">
-                  {ACTIVE_LEAD_STATUSES.map((s) => (
-                    <FunnelRow
-                      barColor={STATUS_DOT_COLORS[s]}
-                      key={s}
-                      label={STATUS_LABELS[s]}
-                      max={maxFunnel}
-                      value={funnelMap[s] ?? 0}
-                    />
-                  ))}
-                </div>
-              </ReportingCard>
-
-              <ReportingCard
-                description="Last 6 months"
-                title="Leads Over Time"
-              >
-                {data.monthlyLeads.length === 0 ? (
-                  <ReportingEmpty message="No data yet" />
-                ) : (
-                  <div className="flex items-end gap-2" style={{ height: 160 }}>
-                    {data.monthlyLeads.map((m) => {
-                      const barH = (m.count / maxMonthly) * 100;
-                      return (
-                        <div
-                          className="group flex flex-1 flex-col items-center justify-end gap-1.5"
-                          key={m.month}
-                          style={{ height: "100%" }}
-                        >
-                          <span className="font-mono text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-                            {m.count}
-                          </span>
-                          <div
-                            className="w-full rounded-md bg-primary/15 transition-all duration-500 group-hover:bg-primary/30"
-                            style={{ height: `${Math.max(barH, 3)}%` }}
-                          />
-                          <span className="text-[11px] text-muted-foreground tabular-nums">
-                            {m.month.slice(5)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </ReportingCard>
-            </div>
-
-            {/* Right: sources + velocity */}
-            <div className="space-y-5 lg:col-span-2">
+          {/* Right column */}
+          <div className="w-72 shrink-0">
+            <div className="sticky top-4 flex flex-col gap-4">
+              {/* By source */}
               <ReportingCard title="By Source">
                 {data.bySource.length === 0 ? (
                   <ReportingEmpty message="No data" />
                 ) : (
-                  <div className="space-y-0.5">
+                  <div className="space-y-px">
                     {data.bySource.map((s) => (
                       <MetricRow
                         barClass="bg-primary/40"
@@ -214,20 +207,21 @@ export function ReportingClient() {
                 )}
               </ReportingCard>
 
+              {/* Conversion by source */}
               <ReportingCard description="By source" title="Conversion Rate">
                 {data.convBySource.length === 0 ? (
                   <ReportingEmpty message="No data" />
                 ) : (
-                  <div className="space-y-1.5">
+                  <div className="space-y-0.5">
                     {data.convBySource.map((s) => (
                       <div
-                        className="flex items-center gap-3 py-1"
+                        className="flex items-center gap-2 py-0.5"
                         key={s.source}
                       >
-                        <span className="w-20 shrink-0 text-[13px] text-muted-foreground">
+                        <span className="w-16 shrink-0 truncate text-[10px] text-muted-foreground">
                           {SOURCE_LABELS[s.source] ?? s.source}
                         </span>
-                        <div className="h-1.5 flex-1 rounded-full bg-muted/50">
+                        <div className="h-1 flex-1 rounded-full bg-muted/40">
                           <div
                             className={cn(
                               "h-full rounded-full transition-all duration-500",
@@ -235,7 +229,7 @@ export function ReportingClient() {
                             )}
                             style={{
                               width: `${Math.max(s.rate, 2)}%`,
-                              minWidth: s.rate > 0 ? "6px" : undefined,
+                              minWidth: s.rate > 0 ? "4px" : undefined,
                             }}
                           />
                         </div>
@@ -246,12 +240,13 @@ export function ReportingClient() {
                 )}
               </ReportingCard>
 
+              {/* Stage duration */}
               <ReportingCard
                 description="Avg days per stage"
                 title="Stage Duration"
               >
                 {velocity && velocityEntries.length > 0 ? (
-                  <div className="space-y-1">
+                  <div className="space-y-px">
                     {velocityEntries.map((s) => {
                       const v = velocity[s];
                       if (!v) {
@@ -259,23 +254,23 @@ export function ReportingClient() {
                       }
                       return (
                         <div
-                          className="flex items-center justify-between py-1.5"
+                          className="flex items-center justify-between py-0.5"
                           key={s}
                         >
-                          <span className="text-[13px] text-muted-foreground">
+                          <span className="text-[11px] text-muted-foreground">
                             {STATUS_LABELS[s]}
                           </span>
-                          <div className="flex items-baseline gap-2">
+                          <div className="flex items-baseline gap-1.5">
                             <span
                               className={cn(
-                                "font-mono font-semibold text-sm",
+                                "font-mono font-semibold text-[12px]",
                                 STATUS_TEXT_COLORS[s]
                               )}
                             >
                               {v.avg}d
                             </span>
-                            <span className="text-[11px] text-muted-foreground/50 tabular-nums">
-                              {v.count} leads
+                            <span className="text-[9px] text-muted-foreground/50 tabular-nums">
+                              {v.count}
                             </span>
                           </div>
                         </div>
@@ -288,9 +283,6 @@ export function ReportingClient() {
               </ReportingCard>
             </div>
           </div>
-
-          {/* ── Activity log ── */}
-          <ActivityLog />
         </div>
       </div>
     </div>
