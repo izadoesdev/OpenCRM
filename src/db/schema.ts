@@ -238,6 +238,8 @@ export const appSettings = pgTable("app_settings", {
     .$defaultFn(() => "default"),
   currency: text("currency").notNull().default("USD"),
   dateFormat: text("date_format").notNull().default("MM/DD/YYYY"),
+  emailFrom: text("email_from"),
+  allowedDomain: text("allowed_domain"),
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .$onUpdate(() => new Date())

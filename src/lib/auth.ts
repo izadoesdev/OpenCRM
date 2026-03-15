@@ -1,13 +1,26 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 
-const ALLOWED_DOMAIN = process.env.ALLOWED_DOMAIN ?? "";
+const ENV_ALLOWED_DOMAIN = process.env.ALLOWED_DOMAIN ?? "";
 
 if (!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)) {
   throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set");
+}
+
+async function getAllowedDomain(): Promise<string> {
+  try {
+    const row = await db.query.appSettings.findFirst({
+      where: eq(schema.appSettings.id, "default"),
+      columns: { allowedDomain: true },
+    });
+    return row?.allowedDomain || ENV_ALLOWED_DOMAIN;
+  } catch {
+    return ENV_ALLOWED_DOMAIN;
+  }
 }
 
 export const auth = betterAuth({
@@ -34,9 +47,10 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
-          if (ALLOWED_DOMAIN && !user.email?.endsWith(`@${ALLOWED_DOMAIN}`)) {
+          const domain = await getAllowedDomain();
+          if (domain && !user.email?.endsWith(`@${domain}`)) {
             await Promise.reject(
-              new Error(`Only @${ALLOWED_DOMAIN} email addresses are allowed.`)
+              new Error(`Only @${domain} email addresses are allowed.`)
             );
           }
           return { data: user };

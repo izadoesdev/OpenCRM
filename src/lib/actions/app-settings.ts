@@ -35,12 +35,12 @@ export async function getAppSettings() {
   return ensureSettings();
 }
 
-export async function updateAppSettings(
-  data: Partial<{
-    currency: string;
-    dateFormat: string;
-  }>
-) {
+export async function updateAppSettings(data: {
+  currency?: string;
+  dateFormat?: string;
+  emailFrom?: string | null;
+  allowedDomain?: string | null;
+}) {
   await getUser();
   await ensureSettings();
   const [row] = await db

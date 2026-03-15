@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "motion/react";
 import {
   type ReactNode,
   useCallback,
@@ -134,8 +135,17 @@ export function SettingsClient() {
       <div className="flex min-h-0 flex-1">
         <nav className="hidden w-52 shrink-0 border-r md:block">
           <div className="sticky top-0 space-y-4 p-3">
-            {NAV_GROUPS.map((group) => (
-              <div key={group.label}>
+            {NAV_GROUPS.map((group, gi) => (
+              <motion.div
+                animate={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, x: -8 }}
+                key={group.label}
+                transition={{
+                  delay: gi * 0.08,
+                  duration: 0.3,
+                  ease: [0.25, 0.1, 0.25, 1],
+                }}
+              >
                 <p className="mb-1.5 px-2.5 font-medium text-[11px] text-muted-foreground/70 uppercase tracking-widest">
                   {group.label}
                 </p>
@@ -150,7 +160,7 @@ export function SettingsClient() {
                     />
                   ))}
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </nav>
@@ -158,10 +168,19 @@ export function SettingsClient() {
         <div className="min-h-0 flex-1 overflow-y-auto" ref={scrollRef}>
           <div className="mx-auto max-w-2xl px-6 py-8">
             {ALL_SECTION_IDS.map((id, i) => (
-              <div key={id}>
+              <motion.div
+                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 16 }}
+                key={id}
+                transition={{
+                  delay: i * 0.06,
+                  duration: 0.4,
+                  ease: [0.25, 0.1, 0.25, 1],
+                }}
+              >
                 {i > 0 && <Divider />}
                 {SECTION_COMPONENTS[id]?.()}
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
