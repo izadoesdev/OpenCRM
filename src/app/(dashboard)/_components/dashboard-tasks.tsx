@@ -1,12 +1,9 @@
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { MeetingLinkPill } from "@/components/meeting-detail";
-import { Pill, SectionHeader } from "@/components/micro";
+import { SectionHeader } from "@/components/micro";
 import { EmptyState } from "@/components/page-skeleton";
 import { TaskCheckbox } from "@/components/task-checkbox";
 import { RecurrenceBadge, TaskTypeBadge } from "@/components/task-type-picker";
-import { Button } from "@/components/ui/button";
 import dayjs from "@/lib/dayjs";
 import type { useToggleTask } from "@/lib/queries";
 import { cn, getDueLabel } from "@/lib/utils";
@@ -48,26 +45,11 @@ export function DashboardTasks({
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <h2 className="font-medium text-sm">
-          Your Tasks
-          {overdue.length > 0 && (
-            <Pill className="ml-2" variant="danger">
-              {overdue.length} overdue
-            </Pill>
-          )}
-        </h2>
-        <Button render={<Link href="/tasks" />} size="sm" variant="ghost">
-          All tasks
-          <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.5} />
-        </Button>
-      </div>
-
       {tasks.length === 0 && (
         <EmptyState message="No open tasks — you're all caught up" />
       )}
 
-      <div className="mt-3 space-y-4">
+      <div className="space-y-4">
         <TaskGroup
           label="Overdue"
           labelClass="text-red-600"

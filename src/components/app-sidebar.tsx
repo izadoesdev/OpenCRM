@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AiMagicIcon,
   Contact01Icon,
   DashboardBrowsingIcon,
   DollarCircleIcon,
@@ -13,6 +14,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import { UserAvatar } from "@/components/micro";
 import {
   DropdownMenu,
@@ -37,6 +39,7 @@ import {
 } from "@/components/ui/sidebar";
 import { signOut, useSession } from "@/lib/auth-client";
 import { useTasks } from "@/lib/queries";
+import { AgentChatDrawer } from "./agent-chat-drawer";
 
 const MAIN_NAV = [
   { title: "Dashboard", href: "/", icon: DashboardBrowsingIcon },
@@ -52,6 +55,7 @@ const SECONDARY_NAV = [
     icon: PresentationBarChart01Icon,
   },
   { title: "Finances", href: "/finances", icon: DollarCircleIcon },
+  { title: "AI Agents", href: "/agents", icon: AiMagicIcon },
   { title: "Settings", href: "/settings", icon: Settings01Icon },
 ];
 
@@ -64,6 +68,7 @@ export function AppSidebar() {
   const router = useRouter();
   const { data: session } = useSession();
   const { data: tasks } = useTasks();
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
 
   const user = session?.user;
   const openTaskCount = tasks?.filter((t) => !t.completedAt).length ?? 0;
@@ -136,6 +141,15 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() => setAiDrawerOpen(true)}
+              tooltip="AI Assistant"
+            >
+              <HugeiconsIcon icon={AiMagicIcon} size={18} strokeWidth={1.5} />
+              <span>AI Assistant</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -187,6 +201,8 @@ export function AppSidebar() {
       </SidebarFooter>
 
       <SidebarRail />
+
+      <AgentChatDrawer onOpenChange={setAiDrawerOpen} open={aiDrawerOpen} />
     </Sidebar>
   );
 }

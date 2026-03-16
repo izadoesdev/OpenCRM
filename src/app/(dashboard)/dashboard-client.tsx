@@ -1,15 +1,11 @@
 "use client";
 
-import {
-  Add01Icon,
-  ChartLineData03Icon,
-  Contact01Icon,
-  MoneyReceive01Icon,
-  UserMultiple02Icon,
-} from "@hugeicons/core-free-icons";
+import { Add01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { LeadFormDialog } from "@/components/lead-form-dialog";
+import { Pill } from "@/components/micro";
 import { PageHeader } from "@/components/page-header";
 import { PageSkeleton } from "@/components/page-skeleton";
 import { SegmentedControl } from "@/components/segmented-control";
@@ -30,7 +26,28 @@ import {
 } from "./_components/dashboard-tasks";
 import { PipelineChart } from "./_components/pipeline-chart";
 import { type RecentLead, RecentLeads } from "./_components/recent-leads";
-import { StatCard, StatCardRow } from "./_components/stat-cards";
+import { ReportingCard } from "./reporting/_components/reporting-primitives";
+
+function Stat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  accent?: string;
+}) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span
+        className={`font-mono font-semibold text-sm tabular-nums ${accent ?? ""}`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
 
 export function DashboardClient() {
   const fmtCents = useFormatCents();
@@ -68,11 +85,17 @@ export function DashboardClient() {
   const { stats, pipelineCounts } = data;
   const recentLeads = data.recentLeads as RecentLead[];
   const allTasks = data.upcomingTasks as DashTaskItem[];
+  const overdueCount = allTasks.filter(
+    (t) =>
+      !t.completedAt &&
+      dayjs(t.dueAt).isBefore(dayjs(), "minute") &&
+      !dayjs(t.dueAt).isToday()
+  ).length;
 
   return (
     <div className="flex h-full flex-col">
       <PageHeader>
-        <div className="flex flex-1 items-center justify-between">
+        <div className="flex flex-1 items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <h1 className="font-semibold text-lg tracking-tight">Dashboard</h1>
             <SegmentedControl
@@ -86,67 +109,113 @@ export function DashboardClient() {
               value={dateRange}
             />
           </div>
-          <Button onClick={() => setShowForm(true)} size="sm">
-            <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
-            Add Lead
-          </Button>
+          <div className="flex items-center gap-5">
+            <Stat
+              accent="text-blue-600"
+              label="Leads"
+              value={stats.totalLeads}
+            />
+            <Stat
+              accent="text-amber-600"
+              label="Qualified"
+              value={stats.qualified}
+            />
+            <Stat
+              accent="text-emerald-600"
+              label="Conv"
+              value={stats.conversionRate}
+            />
+            <Stat
+              accent="text-violet-600"
+              label="Revenue"
+              value={fmtCents(stats.revenue)}
+            />
+            <Button onClick={() => setShowForm(true)} size="sm">
+              <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+              Add Lead
+            </Button>
+          </div>
         </div>
       </PageHeader>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-7xl space-y-6 p-5">
-          {/* ── Stat cards ──────────────────────────────────── */}
-          <StatCardRow>
-            <StatCard
-              color="bg-blue-500/10 text-blue-600"
-              icon={Contact01Icon}
-              label="Total Leads"
-              value={stats.totalLeads}
-            />
-            <StatCard
-              color="bg-amber-500/10 text-amber-600"
-              icon={UserMultiple02Icon}
-              label="Qualified"
-              value={stats.qualified}
-            />
-            <StatCard
-              color="bg-emerald-500/10 text-emerald-600"
-              icon={ChartLineData03Icon}
-              label="Conversion"
-              value={stats.conversionRate}
-            />
-            <StatCard
-              color="bg-violet-500/10 text-violet-600"
-              icon={MoneyReceive01Icon}
-              label="Revenue"
-              value={fmtCents(stats.revenue)}
-            />
-          </StatCardRow>
-
-          {/* ── Main content grid ───────────────────────────── */}
-          <div className="grid gap-6 lg:grid-cols-5">
-            {/* Left column — Tasks + Calendar */}
-            <div className="space-y-6 lg:col-span-3">
-              <div className="rounded-xl border p-5">
-                <DashboardTasks tasks={allTasks} toggleTask={toggleTask} />
-              </div>
-
-              {gConn?.hasCalendar && calEvents.length > 0 && (
-                <div className="rounded-xl border p-5">
-                  <CalendarEvents events={calEvents} />
+        <div className="mx-auto flex max-w-[1400px] gap-4 p-4">
+          {/* Main column */}
+          <div className="flex min-w-0 flex-1 flex-col gap-4">
+            <ReportingCard
+              action={
+                <div className="flex items-center gap-2">
+                  {overdueCount > 0 && (
+                    <Pill variant="danger">{overdueCount} overdue</Pill>
+                  )}
+                  <Button
+                    render={<Link href="/tasks" />}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    All tasks
+                    <HugeiconsIcon
+                      icon={ArrowRight01Icon}
+                      size={14}
+                      strokeWidth={1.5}
+                    />
+                  </Button>
                 </div>
-              )}
-            </div>
+              }
+              title="Your Tasks"
+            >
+              <DashboardTasks tasks={allTasks} toggleTask={toggleTask} />
+            </ReportingCard>
 
-            {/* Right column — Pipeline + Recent Leads */}
-            <div className="space-y-6 lg:col-span-2">
-              <div className="rounded-xl border p-5">
+            {gConn?.hasCalendar && calEvents.length > 0 && (
+              <ReportingCard title="Upcoming Events">
+                <CalendarEvents events={calEvents} />
+              </ReportingCard>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="w-72 shrink-0">
+            <div className="sticky top-4 flex flex-col gap-4">
+              <ReportingCard
+                action={
+                  <Button
+                    render={<Link href="/pipeline" />}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Board
+                    <HugeiconsIcon
+                      icon={ArrowRight01Icon}
+                      size={14}
+                      strokeWidth={1.5}
+                    />
+                  </Button>
+                }
+                title="Pipeline"
+              >
                 <PipelineChart counts={pipelineCounts} />
-              </div>
+              </ReportingCard>
 
-              <div className="rounded-xl border p-5">
+              <ReportingCard
+                action={
+                  <Button
+                    render={<Link href="/leads" />}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    All leads
+                    <HugeiconsIcon
+                      icon={ArrowRight01Icon}
+                      size={14}
+                      strokeWidth={1.5}
+                    />
+                  </Button>
+                }
+                title="Recent Leads"
+              >
                 <RecentLeads leads={recentLeads} />
-              </div>
+              </ReportingCard>
             </div>
           </div>
         </div>

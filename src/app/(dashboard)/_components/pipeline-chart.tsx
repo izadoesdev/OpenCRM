@@ -1,7 +1,4 @@
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import {
   LEAD_STATUSES,
   STATUS_DOT_COLORS,
@@ -19,15 +16,7 @@ export function PipelineChart({ counts }: { counts: Record<string, number> }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <h2 className="font-medium text-sm">Pipeline</h2>
-        <Button render={<Link href="/pipeline" />} size="sm" variant="ghost">
-          Board
-          <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.5} />
-        </Button>
-      </div>
-
-      <div className="mt-3 space-y-1.5">
+      <div className="space-y-1.5">
         {ACTIVE_STATUSES.map((status) => {
           const c = counts[status] ?? 0;
           const pct = maxCount > 0 ? (c / maxCount) * 100 : 0;
@@ -58,7 +47,7 @@ export function PipelineChart({ counts }: { counts: Record<string, number> }) {
         })}
       </div>
 
-      <div className="mt-3 flex items-center gap-4 border-t pt-3 text-xs">
+      <div className="mt-2 flex items-center gap-4 border-t pt-2 text-xs">
         {(["converted", "lost", "churned"] as const).map((s) => (
           <span className="text-muted-foreground" key={s}>
             <span className={STATUS_TEXT_COLORS[s]}>{counts[s] ?? 0}</span>{" "}
