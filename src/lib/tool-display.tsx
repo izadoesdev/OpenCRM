@@ -324,7 +324,10 @@ const TOOLS: Record<string, ToolConfig> = {
 
   searchEmails: {
     label: (input) => {
-      const q = input.query as string;
+      const q = input.query as string | undefined;
+      if (!q) {
+        return "Searching emails";
+      }
       if (q.length > 40) {
         return `Searching emails: ${q.slice(0, 37)}...`;
       }
