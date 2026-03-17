@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 type Input = Record<string, unknown>;
 type Output = Record<string, unknown>;
 
@@ -8,6 +10,7 @@ function countArray(output: Output, key: string): number | null {
 
 interface ToolConfig {
   label: (input: Input) => string;
+  render?: (output: Output) => ReactNode | null;
   result: (output: Output) => string | null;
 }
 
@@ -231,6 +234,29 @@ export function formatToolResult(
 
   const config = TOOLS[toolName];
   return config ? config.result(parsed) : null;
+}
+
+export function formatToolOutput(
+  toolName: string,
+  output: unknown
+): ReactNode | null {
+  const parsed = parseOutput(output);
+  if (!parsed) {
+    return null;
+  }
+
+  if ("errorText" in parsed && typeof parsed.errorText === "string") {
+    return (
+      <p className="text-destructive text-xs">Error: {parsed.errorText}</p>
+    );
+  }
+
+  const config = TOOLS[toolName];
+  if (config?.render) {
+    return config.render(parsed);
+  }
+
+  return null;
 }
 
 function parseOutput(output: unknown): Output | null {

@@ -48,7 +48,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { formatToolLabel, formatToolResult } from "@/lib/tool-display";
+import { parseContentSegments } from "@/lib/ai-components";
+import {
+  formatToolLabel,
+  formatToolOutput,
+  formatToolResult,
+} from "@/lib/tool-display";
+import { AIComponent } from "./ai-elements/ai-component";
 
 type MessagePart = UIMessage["parts"][number];
 
@@ -170,7 +176,9 @@ function renderMessagePart(
               key={`${key}-${step.name}`}
               label={step.summary}
               status="complete"
-            />
+            >
+              {formatToolOutput(step.name, step.output)}
+            </ChainOfThoughtStep>
           ))}
         </ChainOfThoughtContent>
       </ChainOfThought>
@@ -200,10 +208,32 @@ function renderMessagePart(
       return null;
     }
 
+    const { segments } = parseContentSegments(textPart.text);
+    if (segments.length === 0) {
+      return null;
+    }
+
     return (
-      <MessageResponse isAnimating={isCurrentlyStreaming} key={key} mode={mode}>
-        {textPart.text}
-      </MessageResponse>
+      <div className="space-y-4" key={key}>
+        {segments.map((segment) => {
+          const segKey =
+            segment.type === "text"
+              ? `${key}-text-${typeof segment.content === "string" ? segment.content.slice(0, 20) : ""}`
+              : `${key}-cmp-${segment.content.type}`;
+          if (segment.type === "text") {
+            return (
+              <MessageResponse
+                isAnimating={isCurrentlyStreaming}
+                key={segKey}
+                mode={mode}
+              >
+                {segment.content}
+              </MessageResponse>
+            );
+          }
+          return <AIComponent input={segment.content} key={segKey} />;
+        })}
+      </div>
     );
   }
 

@@ -1,0 +1,141 @@
+import { type DataTableProps, DataTableRenderer } from "./renderers/data-table";
+import {
+  type FinanceOverviewProps,
+  FinanceOverviewRenderer,
+} from "./renderers/finance-overview";
+import { type LeadCardProps, LeadCardRenderer } from "./renderers/lead-card";
+import { type LeadListProps, LeadListRenderer } from "./renderers/lead-list";
+import type {
+  ComponentDefinition,
+  ComponentRegistry,
+  DataTableInput,
+  FinanceOverviewInput,
+  LeadCardInput,
+  LeadListInput,
+  RawComponentInput,
+} from "./types";
+
+// ── Validators ──
+
+function isDataTableInput(
+  input: RawComponentInput
+): input is RawComponentInput & DataTableInput {
+  if (input.type !== "data-table") {
+    return false;
+  }
+  return Array.isArray(input.columns) && Array.isArray(input.rows);
+}
+
+function isLeadListInput(
+  input: RawComponentInput
+): input is RawComponentInput & LeadListInput {
+  if (input.type !== "lead-list") {
+    return false;
+  }
+  return Array.isArray(input.leads);
+}
+
+function isLeadCardInput(
+  input: RawComponentInput
+): input is RawComponentInput & LeadCardInput {
+  if (input.type !== "lead-card") {
+    return false;
+  }
+  return (
+    typeof input.id === "string" &&
+    typeof input.name === "string" &&
+    typeof input.status === "string"
+  );
+}
+
+function isFinanceOverviewInput(
+  input: RawComponentInput
+): input is RawComponentInput & FinanceOverviewInput {
+  return input.type === "finance-overview";
+}
+
+// ── Transformers ──
+
+function toDataTableProps(input: DataTableInput): DataTableProps {
+  return {
+    title: input.title,
+    description: input.description,
+    columns: input.columns,
+    rows: input.rows,
+    footer: input.footer,
+  };
+}
+
+function toLeadListProps(input: LeadListInput): LeadListProps {
+  return {
+    title: input.title,
+    leads: input.leads,
+  };
+}
+
+function toLeadCardProps(input: LeadCardInput): LeadCardProps {
+  return {
+    id: input.id,
+    name: input.name,
+    email: input.email,
+    company: input.company,
+    status: input.status,
+    value: input.value,
+    valueDollars: input.valueDollars,
+    source: input.source,
+    plan: input.plan,
+    score: input.score,
+    scoreLabel: input.scoreLabel,
+    createdAt: input.createdAt,
+  };
+}
+
+function toFinanceOverviewProps(
+  input: FinanceOverviewInput
+): FinanceOverviewProps {
+  return {
+    mrrCents: input.mrrCents,
+    arrCents: input.arrCents,
+    monthlyBurnCents: input.monthlyBurnCents,
+    netBurnMonthlyCents: input.netBurnMonthlyCents,
+    cashOnHandCents: input.cashOnHandCents,
+    runwayMonths: input.runwayMonths,
+    categoryBreakdown: input.categoryBreakdown,
+  };
+}
+
+// ── Registry ──
+
+export const componentRegistry: ComponentRegistry = {
+  "data-table": {
+    validate: isDataTableInput,
+    transform: toDataTableProps,
+    component: DataTableRenderer,
+  } as ComponentDefinition<DataTableInput, DataTableProps>,
+
+  "lead-list": {
+    validate: isLeadListInput,
+    transform: toLeadListProps,
+    component: LeadListRenderer,
+  } as ComponentDefinition<LeadListInput, LeadListProps>,
+
+  "lead-card": {
+    validate: isLeadCardInput,
+    transform: toLeadCardProps,
+    component: LeadCardRenderer,
+  } as ComponentDefinition<LeadCardInput, LeadCardProps>,
+
+  "finance-overview": {
+    validate: isFinanceOverviewInput,
+    transform: toFinanceOverviewProps,
+    component: FinanceOverviewRenderer,
+  } as ComponentDefinition<FinanceOverviewInput, FinanceOverviewProps>,
+};
+
+export function hasComponent(type: string): boolean {
+  return type in componentRegistry;
+}
+
+export function getComponent(type: string) {
+  return componentRegistry[type];
+}
