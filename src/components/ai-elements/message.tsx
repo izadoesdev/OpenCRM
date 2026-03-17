@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  ArrowLeft01Icon,
-  ArrowRight01Icon,
-  BulbIcon,
-} from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
@@ -364,57 +360,3 @@ export const MessageToolbar = ({
     {children}
   </div>
 );
-
-export type MessageReasoningProps = HTMLAttributes<HTMLDivElement> & {
-  text: string;
-  collapsed?: boolean;
-};
-
-export const MessageReasoning = ({
-  text,
-  collapsed: initialCollapsed = true,
-  className,
-  ...props
-}: MessageReasoningProps) => {
-  const [collapsed, setCollapsed] = useState(initialCollapsed);
-
-  if (!text.trim()) {
-    return null;
-  }
-
-  return (
-    <div
-      className={cn(
-        "rounded-lg border border-border/60 border-dashed bg-muted/20",
-        className
-      )}
-      {...props}
-    >
-      <button
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-muted/40"
-        onClick={() => setCollapsed(!collapsed)}
-        type="button"
-      >
-        <HugeiconsIcon
-          className="shrink-0 text-amber-500"
-          icon={BulbIcon}
-          size={13}
-          strokeWidth={1.5}
-        />
-        <span className="flex-1 font-medium text-muted-foreground">
-          Reasoning
-        </span>
-        <span className="text-[10px] text-muted-foreground/60">
-          {collapsed ? "Show" : "Hide"}
-        </span>
-      </button>
-      {!collapsed && (
-        <div className="border-border/60 border-t border-dashed px-3 pt-2 pb-2.5">
-          <p className="whitespace-pre-wrap text-muted-foreground text-xs leading-relaxed">
-            {text}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-};

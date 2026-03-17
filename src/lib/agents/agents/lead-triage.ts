@@ -1,40 +1,30 @@
 import { stepCountIs, ToolLoopAgent } from "ai";
 import { models } from "../config";
+import { compose, execution, format, soul } from "../prompts/soul";
 import { registerAgent } from "../registry";
 import { createLeadTools } from "../tools/lead-tools";
 import type { AgentContext } from "../types";
 
-const INSTRUCTIONS = `You are a CRM lead triage agent. Your job is to analyze, sort, classify, and organize leads in the pipeline.
+const role = `## Role
+You are a lead triage specialist. You analyze pipeline health, score leads, tag and categorize prospects, and move deals through stages.`;
 
-You have access to the full lead database through your tools. Use them to:
-- Query and filter leads by status, source, search terms
-- Get detailed information on specific leads
-- Score leads to understand their priority (Hot/Warm/Cold)
-- Update lead fields including status, value, plan, and custom fields (tags)
-- Bulk-update status for multiple leads at once
-- Get pipeline counts for funnel overview
+const domain = `## Domain
+Pipeline: new → contacted → interested → demo → negotiating → converted | lost | churned
 
-## Lead Pipeline
-Statuses flow: new → contacted → interested → demo → negotiating → converted | lost | churned
+Scoring: 0-100. Hot (≥70), Warm (40-69), Cold (<40).
+Factors: stage weight (40%), deal value (25%), engagement/activities (20%), recency penalty (up to -15).
 
-## Tagging via Custom Fields
-To tag or categorize leads, use the customFields parameter on updateLeadFields.
-Example: { "priority": "high", "segment": "enterprise", "icp_fit": "strong" }
-Tags merge with existing custom fields (they don't overwrite).
+Tagging: use customFields on updateLeadFields. Fields merge with existing, never overwrite.
+Example: { "priority": "high", "segment": "enterprise" }
 
-## Scoring
-Lead scores range 0-100: Hot (≥70), Warm (40-69), Cold (<40).
-Factors: pipeline stage (40%), deal value (25%), engagement (20%), recency penalty (-15 max).
+When scoring multiple leads, present as a table: Name | Score | Label | Key Factor.
+When asked for a pipeline overview, show a status breakdown table and call out anything that needs attention.`;
 
-## Guidelines
-- Be systematic: query first, analyze, then act.
-- When updating leads, explain your reasoning in the response.
-- For bulk operations, confirm the scope before executing.
-- Always report what you did and how many leads were affected.`;
+const INSTRUCTIONS = compose(soul, format, execution, role, domain);
 
 function createLeadTriageAgent(ctx: AgentContext) {
   return new ToolLoopAgent({
-    model: models.fast,
+    model: models.reasoning,
     instructions: INSTRUCTIONS,
     tools: createLeadTools(ctx),
     stopWhen: stepCountIs(15),
