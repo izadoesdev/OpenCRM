@@ -6,7 +6,6 @@ import {
 import { type LeadCardProps, LeadCardRenderer } from "./renderers/lead-card";
 import { type LeadListProps, LeadListRenderer } from "./renderers/lead-list";
 import type {
-  ComponentDefinition,
   ComponentRegistry,
   DataTableInput,
   FinanceOverviewInput,
@@ -106,36 +105,36 @@ function toFinanceOverviewProps(
 
 // ── Registry ──
 
-export const componentRegistry: ComponentRegistry = {
+export const componentRegistry = {
   "data-table": {
     validate: isDataTableInput,
     transform: toDataTableProps,
     component: DataTableRenderer,
-  } as ComponentDefinition<DataTableInput, DataTableProps>,
+  },
 
   "lead-list": {
     validate: isLeadListInput,
     transform: toLeadListProps,
     component: LeadListRenderer,
-  } as ComponentDefinition<LeadListInput, LeadListProps>,
+  },
 
   "lead-card": {
     validate: isLeadCardInput,
     transform: toLeadCardProps,
     component: LeadCardRenderer,
-  } as ComponentDefinition<LeadCardInput, LeadCardProps>,
+  },
 
   "finance-overview": {
     validate: isFinanceOverviewInput,
     transform: toFinanceOverviewProps,
     component: FinanceOverviewRenderer,
-  } as ComponentDefinition<FinanceOverviewInput, FinanceOverviewProps>,
-};
+  },
+} satisfies ComponentRegistry;
 
 export function hasComponent(type: string): boolean {
   return type in componentRegistry;
 }
 
 export function getComponent(type: string) {
-  return componentRegistry[type];
+  return (componentRegistry as ComponentRegistry)[type];
 }
