@@ -6,6 +6,7 @@ import { lead } from "@/db/schema";
 import {
   getEmailThread,
   getLeadEmails,
+  getRecentSentEmails,
   sendGmailEmail,
 } from "@/lib/actions/gmail";
 import { checkGoogleConnection } from "@/lib/google";
@@ -136,9 +137,41 @@ function createGmailTools() {
     },
   });
 
+  const getMyEmailStyle = tool({
+    description:
+      "Fetch the user's recent sent emails to learn their writing style, tone, greeting, and sign-off patterns. Call this BEFORE drafting any email so you can match their voice.",
+    inputSchema: z.object({
+      count: z
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .optional()
+        .describe("Number of recent sent emails to fetch (default 5)"),
+    }),
+    execute: async ({ count }) => {
+      const conn = await checkGoogleConnection();
+      if (!(conn.connected && conn.hasGmail)) {
+        return { error: "Gmail not connected. Connect in Settings > Google." };
+      }
+
+      const messages = await getRecentSentEmails(count ?? 15);
+
+      return {
+        count: messages.length,
+        samples: messages.map((m) => ({
+          to: m.to,
+          subject: m.subject,
+          bodyText: m.bodyText.slice(0, 800),
+        })),
+      };
+    },
+  });
+
   return {
     searchEmails,
     readEmailThread: readThread,
+    getMyEmailStyle,
     sendLeadEmail,
   };
 }

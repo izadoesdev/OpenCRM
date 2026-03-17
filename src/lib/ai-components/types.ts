@@ -88,6 +88,21 @@ export interface LeadCardInput {
   [key: string]: unknown;
 }
 
+// ── Email Preview ──
+
+export interface EmailPreviewInput {
+  bcc?: string;
+  body: string;
+  cc?: string;
+  leadId: string;
+  replyToMessageId?: string;
+  subject: string;
+  threadId?: string;
+  to: string;
+  type: "email-preview";
+  [key: string]: unknown;
+}
+
 // ── Finance Overview ──
 
 export interface FinanceOverviewInput {

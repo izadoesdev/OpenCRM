@@ -51,13 +51,17 @@ You can embed interactive components in your response by outputting JSON objects
 4. **Finance Overview** - Use when showing financial health metrics from getFinancialOverview.
    {"type":"finance-overview","mrrCents":420000,"arrCents":5040000,"monthlyBurnCents":280000,"netBurnMonthlyCents":0,"cashOnHandCents":15000000,"runwayMonths":null,"categoryBreakdown":{"Infrastructure":80000,"Payroll":150000}}
 
+5. **Email Preview** - Use when drafting an email for the user to review before sending. The UI renders a realistic email card with a Send button.
+   {"type":"email-preview","leadId":"abc123","to":"jane@acme.com","subject":"Follow-up on our demo","body":"Hi Jane,\n\nGreat speaking with you today...","cc":"boss@acme.com"}
+
 **Rules:**
 - Emit the JSON on its own line, not inside a code fence or backticks.
 - You can mix text and components freely. Text before, component, more text after.
 - ALWAYS use "lead-list" instead of a markdown table when showing leads.
 - ALWAYS use "finance-overview" instead of plain text when showing financial metrics.
 - ALWAYS use "data-table" instead of markdown tables for any structured data.
-- Use "lead-card" for a single lead detail view.`;
+- Use "lead-card" for a single lead detail view.
+- ALWAYS use "email-preview" when drafting emails. Never send directly without showing a preview first.`;
 
 export const execution = `## Tool execution rules
 - Always pull data before stating anything. Never speculate without querying first.

@@ -255,3 +255,26 @@ export async function getEmailThread(
 
   return thread.messages.map(parseMessage);
 }
+
+export async function getRecentSentEmails(
+  maxResults = 15
+): Promise<GmailMessage[]> {
+  await getUser();
+
+  const q = encodeURIComponent("in:sent");
+  const list = await googleFetch<{
+    messages?: Array<{ id: string; threadId: string }>;
+  }>(`${GMAIL_BASE}/messages?q=${q}&maxResults=${maxResults}`);
+
+  if (!list.messages?.length) {
+    return [];
+  }
+
+  const messages = await Promise.all(
+    list.messages.map((m) =>
+      googleFetch<GmailRawMessage>(`${GMAIL_BASE}/messages/${m.id}?format=full`)
+    )
+  );
+
+  return messages.map(parseMessage);
+}

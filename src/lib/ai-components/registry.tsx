@@ -1,5 +1,9 @@
 import { type DataTableProps, DataTableRenderer } from "./renderers/data-table";
 import {
+  type EmailPreviewProps,
+  EmailPreviewRenderer,
+} from "./renderers/email-preview";
+import {
   type FinanceOverviewProps,
   FinanceOverviewRenderer,
 } from "./renderers/finance-overview";
@@ -8,6 +12,7 @@ import { type LeadListProps, LeadListRenderer } from "./renderers/lead-list";
 import type {
   ComponentRegistry,
   DataTableInput,
+  EmailPreviewInput,
   FinanceOverviewInput,
   LeadCardInput,
   LeadListInput,
@@ -44,6 +49,20 @@ function isLeadCardInput(
     typeof input.id === "string" &&
     typeof input.name === "string" &&
     typeof input.status === "string"
+  );
+}
+
+function isEmailPreviewInput(
+  input: RawComponentInput
+): input is RawComponentInput & EmailPreviewInput {
+  if (input.type !== "email-preview") {
+    return false;
+  }
+  return (
+    typeof input.leadId === "string" &&
+    typeof input.to === "string" &&
+    typeof input.subject === "string" &&
+    typeof input.body === "string"
   );
 }
 
@@ -89,6 +108,19 @@ function toLeadCardProps(input: LeadCardInput): LeadCardProps {
   };
 }
 
+function toEmailPreviewProps(input: EmailPreviewInput): EmailPreviewProps {
+  return {
+    leadId: input.leadId,
+    to: input.to,
+    subject: input.subject,
+    body: input.body,
+    cc: input.cc,
+    bcc: input.bcc,
+    threadId: input.threadId,
+    replyToMessageId: input.replyToMessageId,
+  };
+}
+
 function toFinanceOverviewProps(
   input: FinanceOverviewInput
 ): FinanceOverviewProps {
@@ -122,6 +154,12 @@ export const componentRegistry = {
     validate: isLeadCardInput,
     transform: toLeadCardProps,
     component: LeadCardRenderer,
+  },
+
+  "email-preview": {
+    validate: isEmailPreviewInput,
+    transform: toEmailPreviewProps,
+    component: EmailPreviewRenderer,
   },
 
   "finance-overview": {

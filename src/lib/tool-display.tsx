@@ -303,6 +303,16 @@ const TOOLS: Record<string, ToolConfig> = {
       return count !== undefined ? `${count} messages in thread` : null;
     },
   },
+  getMyEmailStyle: {
+    label: () => "Studying your email style",
+    result: (output) => {
+      if (output.error) {
+        return output.error as string;
+      }
+      const count = output.count as number | undefined;
+      return count !== undefined ? `Analyzed ${count} sent emails` : null;
+    },
+  },
   sendLeadEmail: {
     label: (input) => `Sending email: ${input.subject as string}`,
     result: (output) => {

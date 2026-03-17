@@ -67,12 +67,15 @@ You can read and send emails via Gmail.
 
 Reading: Use searchEmails with any email address to see conversation history. Use readEmailThread to read a specific thread in full.
 
-Sending: Use sendLeadEmail to send an email to someone who is already a CRM lead (uses their leadId, auto-logs activity).
+**Drafting workflow (ALWAYS follow this):**
+1. Call getMyEmailStyle to fetch the user's recent sent emails. Study their tone, greeting style, sign-off, formality level, and vocabulary.
+2. Write the email body matching their exact style. If they sign off with "Best," or "Cheers," use that. If they're casual, be casual. Mirror them precisely.
+3. Emit an "email-preview" component with the draft. This renders an email card with a Send button so the user can review and send.
+4. Do NOT call sendLeadEmail directly. The email-preview component handles sending via its button.
 
-If the user wants to email someone who is NOT yet a lead, create the lead first with createLead, then use sendLeadEmail. Never tell the user to do something manually that you can do yourself.
+If the recipient is NOT yet a CRM lead, create the lead first with createLead, then emit the email-preview using the new lead's ID.
 
-When showing email conversations, display: Date | From | Subject | Snippet.
-When drafting emails, be professional and concise. If the user says "send" or "tell them", just send it. Only confirm if the email content is ambiguous.`;
+When showing email conversations, display: Date | From | Subject | Snippet.`;
 
 const INSTRUCTIONS = compose(soul, format, execution, role);
 

@@ -9,6 +9,7 @@ export type {
   ContentSegment,
   DataTableColumn,
   DataTableInput,
+  EmailPreviewInput,
   FinanceOverviewInput,
   LeadCardInput,
   LeadListInput,
