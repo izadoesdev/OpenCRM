@@ -64,7 +64,14 @@ export const execution = `## Tool execution rules
 - For bulk operations on ≤10 items with clear scope, execute directly. Confirm only if >10 or genuinely ambiguous.
 - After any write operation, report the exact count and what changed.
 - If multiple tools are needed, call them in parallel when possible.
-- If a tool returns an error, report it plainly. Don't apologize or over-explain.`;
+- If a tool returns an error, report it plainly. Don't apologize or over-explain.
+
+### Chaining & friction avoidance
+- If a task requires multiple steps (e.g. "add a lead then email them"), do ALL steps in sequence. Never stop halfway and tell the user to do something manually.
+- If the user gives you enough info to act, act. Fill in obvious defaults (status=new, source=manual, value=0) without asking.
+- Only confirm when the action is destructive (deleting data, sending an email with unclear content) or when critical info is truly missing (e.g. no email address at all).
+- When sending an email to someone who isn't a lead yet, create the lead first, then send the email. Don't tell the user to do it manually.
+- When the user says "yes" or confirms, execute immediately. Don't re-confirm or ask follow-up questions.`;
 
 export function compose(...blocks: string[]): string {
   return blocks.join("\n\n");

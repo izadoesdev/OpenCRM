@@ -15,6 +15,18 @@ interface ToolConfig {
 }
 
 const TOOLS: Record<string, ToolConfig> = {
+  createLead: {
+    label: (input) => `Adding lead: ${input.name as string}`,
+    result: (output) => {
+      if (output.error) {
+        return `Error: ${output.error as string}`;
+      }
+      if (output.success) {
+        return `Created ${output.name as string} (${output.email as string})`;
+      }
+      return null;
+    },
+  },
   queryLeads: {
     label: (input) => {
       if (input.search) {
@@ -210,6 +222,97 @@ const TOOLS: Record<string, ToolConfig> = {
         | Array<{ category: string }>
         | undefined;
       return categories ? `${categories.length} categories` : null;
+    },
+  },
+
+  // ── Calendar tools ──
+
+  listCalendarEvents: {
+    label: (input) => {
+      const max = input.maxResults as number | undefined;
+      return max ? `Checking next ${max} events` : "Checking calendar";
+    },
+    result: (output) => {
+      if (output.error) {
+        return output.error as string;
+      }
+      const count = output.count as number | undefined;
+      return count !== undefined ? `${count} upcoming events` : null;
+    },
+  },
+  createCalendarEvent: {
+    label: (input) => `Creating event: ${input.summary as string}`,
+    result: (output) => {
+      if (output.error) {
+        return output.error as string;
+      }
+      if (output.success) {
+        const parts = ["Event created"];
+        if (output.meetLink) {
+          parts.push("(Meet link included)");
+        }
+        return parts.join(" ");
+      }
+      return null;
+    },
+  },
+  updateCalendarEvent: {
+    label: (input) => {
+      const summary = input.summary as string | undefined;
+      return summary ? `Updating event: ${summary}` : "Updating calendar event";
+    },
+    result: (output) => {
+      if (output.error) {
+        return output.error as string;
+      }
+      if (output.success) {
+        return `Updated: ${output.summary as string}`;
+      }
+      return null;
+    },
+  },
+  deleteCalendarEvent: {
+    label: () => "Deleting calendar event",
+    result: (output) => {
+      if (output.error) {
+        return output.error as string;
+      }
+      return output.success ? "Event deleted" : null;
+    },
+  },
+
+  // ── Gmail tools ──
+
+  searchEmails: {
+    label: (input) => `Searching emails for ${input.email as string}`,
+    result: (output) => {
+      if (output.error) {
+        return output.error as string;
+      }
+      const count = output.count as number | undefined;
+      return count !== undefined ? `${count} messages found` : null;
+    },
+  },
+  readEmailThread: {
+    label: () => "Reading email thread",
+    result: (output) => {
+      if (output.error) {
+        return output.error as string;
+      }
+      const count = output.count as number | undefined;
+      return count !== undefined ? `${count} messages in thread` : null;
+    },
+  },
+  sendLeadEmail: {
+    label: (input) => `Sending email: ${input.subject as string}`,
+    result: (output) => {
+      if (output.error) {
+        return output.error as string;
+      }
+      if (output.success) {
+        return `Sent to ${output.to as string}`;
+      }
+      return null;
     },
   },
 };

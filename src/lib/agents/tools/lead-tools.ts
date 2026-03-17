@@ -19,6 +19,107 @@ import { fireWebhooks } from "@/lib/webhook-dispatch";
 import type { AgentContext } from "../types";
 
 function createLeadTools(ctx: AgentContext) {
+  const createLead = tool({
+    description:
+      "Create a new lead in the CRM. Use sensible defaults: status='new', source='manual', value=0. Returns the created lead with its ID.",
+    inputSchema: z.object({
+      name: z.string().describe("Full name"),
+      email: z.string().describe("Email address"),
+      company: z.string().optional().describe("Company name"),
+      title: z.string().optional().describe("Job title"),
+      phone: z.string().optional().describe("Phone number"),
+      website: z.string().optional().describe("Website URL"),
+      country: z.string().optional().describe("Country"),
+      source: z
+        .enum([
+          "manual",
+          "website",
+          "referral",
+          "linkedin",
+          "cold_email",
+          "api",
+          "other",
+        ])
+        .optional()
+        .describe("Lead source (default: manual)"),
+      status: z
+        .enum(LEAD_STATUSES)
+        .optional()
+        .describe("Pipeline status (default: new)"),
+      plan: z.enum(LEAD_PLANS).optional().describe("Plan tier"),
+      valueCents: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("Deal value in cents (default: 0)"),
+    }),
+    execute: async ({
+      name,
+      email,
+      company,
+      title,
+      phone,
+      website,
+      country,
+      source,
+      status,
+      plan,
+      valueCents,
+    }) => {
+      const existing = await db.query.lead.findFirst({
+        where: eq(lead.email, email),
+        columns: { id: true, name: true, email: true, status: true },
+      });
+      if (existing) {
+        return {
+          error: "A lead with this email already exists",
+          existingLead: existing,
+        };
+      }
+
+      const [created] = await db
+        .insert(lead)
+        .values({
+          name,
+          email,
+          company,
+          title,
+          phone,
+          website,
+          country,
+          source: source ?? "manual",
+          status: status ?? "new",
+          plan,
+          value: valueCents ?? 0,
+        })
+        .returning();
+
+      await db.insert(activity).values({
+        leadId: created.id,
+        userId: ctx.userId,
+        type: "lead_created",
+        content: "Lead created by agent",
+      });
+
+      fireWebhooks("lead.created", {
+        id: created.id,
+        name: created.name,
+        email: created.email,
+      });
+
+      return {
+        success: true,
+        id: created.id,
+        name: created.name,
+        email: created.email,
+        company: created.company,
+        status: created.status,
+        valueDollars: created.value / 100,
+      };
+    },
+  });
+
   const queryLeads = tool({
     description:
       "Search and filter leads. Returns a summary list. Use this to find leads by status, source, search term, or to list all leads.",
@@ -300,6 +401,7 @@ function createLeadTools(ctx: AgentContext) {
   });
 
   return {
+    createLead,
     queryLeads,
     getLeadDetails,
     updateLeadFields,
