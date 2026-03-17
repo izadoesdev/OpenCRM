@@ -220,16 +220,17 @@ function parseMessage(raw: GmailRawMessage): GmailMessage {
   };
 }
 
-export async function getLeadEmails(
-  leadEmail: string,
-  maxResults = 50
+export async function searchGmail(
+  query: string,
+  maxResults = 20
 ): Promise<GmailMessage[]> {
   await getUser();
 
-  const q = encodeURIComponent(`from:${leadEmail} OR to:${leadEmail}`);
   const list = await googleFetch<{
     messages?: Array<{ id: string; threadId: string }>;
-  }>(`${GMAIL_BASE}/messages?q=${q}&maxResults=${maxResults}`);
+  }>(
+    `${GMAIL_BASE}/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`
+  );
 
   if (!list.messages?.length) {
     return [];
@@ -242,6 +243,25 @@ export async function getLeadEmails(
   );
 
   return messages.map(parseMessage);
+}
+
+export async function getLeadEmails(
+  leadEmail: string,
+  maxResults = 50
+): Promise<GmailMessage[]> {
+  return searchGmail(`from:${leadEmail} OR to:${leadEmail}`, maxResults);
+}
+
+export async function getGmailMessage(
+  messageId: string
+): Promise<GmailMessage> {
+  await getUser();
+
+  const raw = await googleFetch<GmailRawMessage>(
+    `${GMAIL_BASE}/messages/${messageId}?format=full`
+  );
+
+  return parseMessage(raw);
 }
 
 export async function getEmailThread(

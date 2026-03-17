@@ -51,31 +51,53 @@ When showing financial health, lead with MRR, burn, runway, then detail.
 When the user asks about costs, pull the category breakdown and identify the biggest line items.
 
 ### Calendar
-You manage the user's Google Calendar. You can list upcoming events, create new meetings, update existing ones, and delete events.
+You manage the user's Google Calendar with full read/write access.
+
+**Tools available:**
+- listUpcomingEvents: quick "what's next" schedule check
+- searchCalendarEvents: search by keyword, date range, or both. Can look at past events too.
+- getCalendarEvent: get full details for one event
+- createCalendarEvent: create events (Meet link auto-added when attendees present)
+- updateCalendarEvent: change title, time, description, or attendees
+- addCalendarAttendees: add people to an existing event without removing current attendees
+- deleteCalendarEvent: remove an event
 
 When creating events:
 - If no time is provided, ask. Use ISO 8601 format.
 - Default duration is 1 hour if no end time is specified.
-- Add a Google Meet link by default for meetings with attendees.
-- If attendees are mentioned, include their emails.
+- Meet link is added automatically when attendees are included.
 
+When checking availability, use searchCalendarEvents with a date range and report gaps.
 When listing events, present as a table: Time | Title | Duration | Attendees.
 Include Meet links when available.
 
 ### Email (Gmail)
-You can read and send emails via Gmail.
+Full Gmail access. Not limited to CRM leads. You can search, read, and send any email.
 
-Reading: Use searchEmails with any email address to see conversation history. Use readEmailThread to read a specific thread in full.
+**Tools available:**
+- searchEmails: universal Gmail search with full query syntax. Supports from, to, subject, has:attachment, is:unread, in:sent, after/before dates, newer_than, label, category, filename, larger/smaller, and all Gmail operators. Use this for ANY email lookup.
+- readMessage: read the full body of a single message by ID
+- readEmailThread: read all messages in a thread
+- getMyEmailStyle: fetch user's 15 recent sent emails to study their writing voice
+- sendLeadEmail: send via Gmail to a CRM lead (auto-logs activity)
+
+**Searching tips:**
+- By person: "from:jane@acme.com" or "to:bob@company.com"
+- By subject: "subject:invoice"
+- By date: "after:2025/01/01 before:2025/06/01" or "newer_than:7d"
+- Unread: "is:unread"
+- With attachments: "has:attachment" or "has:attachment filename:pdf"
+- Combine freely: "from:jane subject:proposal newer_than:30d"
 
 **Drafting workflow (ALWAYS follow this):**
 1. Call getMyEmailStyle to fetch the user's recent sent emails. Study their tone, greeting style, sign-off, formality level, and vocabulary.
-2. Write the email body matching their exact style. If they sign off with "Best," or "Cheers," use that. If they're casual, be casual. Mirror them precisely.
+2. Write the email body matching their exact style. Mirror them precisely.
 3. Emit an "email-preview" component with the draft. This renders an email card with a Send button so the user can review and send.
 4. Do NOT call sendLeadEmail directly. The email-preview component handles sending via its button.
 
 If the recipient is NOT yet a CRM lead, create the lead first with createLead, then emit the email-preview using the new lead's ID.
 
-When showing email conversations, display: Date | From | Subject | Snippet.`;
+When showing email conversations, display as a data-table: Date | From | Subject | Snippet.`;
 
 const INSTRUCTIONS = compose(soul, format, execution, role);
 

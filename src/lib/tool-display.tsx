@@ -227,7 +227,7 @@ const TOOLS: Record<string, ToolConfig> = {
 
   // ── Calendar tools ──
 
-  listCalendarEvents: {
+  listUpcomingEvents: {
     label: (input) => {
       const max = input.maxResults as number | undefined;
       return max ? `Checking next ${max} events` : "Checking calendar";
@@ -238,6 +238,29 @@ const TOOLS: Record<string, ToolConfig> = {
       }
       const count = output.count as number | undefined;
       return count !== undefined ? `${count} upcoming events` : null;
+    },
+  },
+  searchCalendarEvents: {
+    label: (input) => {
+      const q = input.query as string | undefined;
+      return q ? `Searching calendar for "${q}"` : "Searching calendar";
+    },
+    result: (output) => {
+      if (output.error) {
+        return output.error as string;
+      }
+      const count = output.count as number | undefined;
+      return count !== undefined ? `${count} events found` : null;
+    },
+  },
+  getCalendarEvent: {
+    label: () => "Getting event details",
+    result: (output) => {
+      if (output.error) {
+        return output.error as string;
+      }
+      const summary = output.summary as string | undefined;
+      return summary ?? null;
     },
   },
   createCalendarEvent: {
@@ -266,7 +289,23 @@ const TOOLS: Record<string, ToolConfig> = {
         return output.error as string;
       }
       if (output.success) {
-        return `Updated: ${output.summary as string}`;
+        const summary = output.summary as string | undefined;
+        return summary ? `Updated: ${summary}` : "Event updated";
+      }
+      return null;
+    },
+  },
+  addCalendarAttendees: {
+    label: (input) => {
+      const emails = input.emails as string[] | undefined;
+      return `Adding ${emails?.length ?? "?"} attendee(s)`;
+    },
+    result: (output) => {
+      if (output.error) {
+        return output.error as string;
+      }
+      if (output.success) {
+        return `${output.addedCount as number} added (${output.totalAttendees as number} total)`;
       }
       return null;
     },
@@ -284,13 +323,29 @@ const TOOLS: Record<string, ToolConfig> = {
   // ── Gmail tools ──
 
   searchEmails: {
-    label: (input) => `Searching emails for ${input.email as string}`,
+    label: (input) => {
+      const q = input.query as string;
+      if (q.length > 40) {
+        return `Searching emails: ${q.slice(0, 37)}...`;
+      }
+      return `Searching emails: ${q}`;
+    },
     result: (output) => {
       if (output.error) {
         return output.error as string;
       }
       const count = output.count as number | undefined;
       return count !== undefined ? `${count} messages found` : null;
+    },
+  },
+  readMessage: {
+    label: () => "Reading email",
+    result: (output) => {
+      if (output.error) {
+        return output.error as string;
+      }
+      const subject = output.subject as string | undefined;
+      return subject ?? null;
     },
   },
   readEmailThread: {

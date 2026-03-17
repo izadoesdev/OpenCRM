@@ -95,6 +95,37 @@ export async function getUpcomingCalendarEvents(opts?: {
   return data.items ?? [];
 }
 
+export async function searchCalendarEvents(opts: {
+  query?: string;
+  timeMin?: string;
+  timeMax?: string;
+  maxResults?: number;
+}): Promise<CalendarEvent[]> {
+  const params = new URLSearchParams({
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: String(opts.maxResults ?? 25),
+  });
+
+  if (opts.query) {
+    params.set("q", opts.query);
+  }
+  if (opts.timeMin) {
+    params.set("timeMin", opts.timeMin);
+  } else {
+    params.set("timeMin", dayjs().subtract(1, "year").toISOString());
+  }
+  if (opts.timeMax) {
+    params.set("timeMax", opts.timeMax);
+  }
+
+  const data = await googleFetch<CalendarListResponse>(
+    `${CAL_BASE}/calendars/primary/events?${params}`
+  );
+
+  return data.items ?? [];
+}
+
 export async function updateCalendarEvent(
   eventId: string,
   data: {
