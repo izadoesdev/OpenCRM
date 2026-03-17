@@ -182,43 +182,37 @@ export function LeadsPageClient() {
   return (
     <div className="flex h-full flex-col">
       <PageHeader>
-        <div className="flex flex-1 items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <h1 className="font-semibold text-lg tracking-tight">Leads</h1>
-            {leads.length > 0 && (
-              <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-muted-foreground text-xs">
-                {leads.length}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Button onClick={exportCsv} size="sm" variant="outline">
-              <HugeiconsIcon
-                icon={Download01Icon}
-                size={14}
-                strokeWidth={1.5}
-              />
-              Export
-            </Button>
-            <Button
-              onClick={() => setShowImport(true)}
-              size="sm"
-              variant="outline"
-            >
-              <HugeiconsIcon icon={Upload01Icon} size={14} strokeWidth={1.5} />
-              Import
-            </Button>
-            <Button
-              onClick={() => {
-                setEditLead(undefined);
-                setShowForm(true);
-              }}
-              size="sm"
-            >
-              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
-              Add Lead
-            </Button>
-          </div>
+        <div className="flex items-center gap-2.5">
+          <h1 className="font-semibold text-lg tracking-tight">Leads</h1>
+          {leads.length > 0 && (
+            <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-muted-foreground text-xs">
+              {leads.length}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Button onClick={exportCsv} size="sm" variant="outline">
+            <HugeiconsIcon icon={Download01Icon} size={14} strokeWidth={1.5} />
+            Export
+          </Button>
+          <Button
+            onClick={() => setShowImport(true)}
+            size="sm"
+            variant="outline"
+          >
+            <HugeiconsIcon icon={Upload01Icon} size={14} strokeWidth={1.5} />
+            Import
+          </Button>
+          <Button
+            onClick={() => {
+              setEditLead(undefined);
+              setShowForm(true);
+            }}
+            size="sm"
+          >
+            <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+            Add Lead
+          </Button>
         </div>
       </PageHeader>
 

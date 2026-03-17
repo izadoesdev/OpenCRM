@@ -464,61 +464,59 @@ export function TasksPageClient() {
   return (
     <div className="flex h-full flex-col">
       <PageHeader>
-        <div className="flex flex-1 items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <h1 className="font-semibold text-lg tracking-tight">Tasks</h1>
-            {openCount > 0 && <Pill>{openCount} open</Pill>}
-          </div>
+        <div className="flex items-center gap-2.5">
+          <h1 className="font-semibold text-lg tracking-tight">Tasks</h1>
+          {openCount > 0 && <Pill>{openCount} open</Pill>}
+        </div>
 
-          <div className="flex items-center gap-2">
-            <SegmentedControl
-              onChange={(v) => {
-                setViewMode(v);
-                if (v === "mine") {
-                  setUserFilter("all");
-                }
-              }}
-              segments={[
-                { value: "mine" as const, label: "My Tasks" },
-                { value: "all" as const, label: "All Tasks" },
-              ]}
-              value={viewMode}
-            />
+        <div className="flex items-center gap-2">
+          <SegmentedControl
+            onChange={(v) => {
+              setViewMode(v);
+              if (v === "mine") {
+                setUserFilter("all");
+              }
+            }}
+            segments={[
+              { value: "mine" as const, label: "My Tasks" },
+              { value: "all" as const, label: "All Tasks" },
+            ]}
+            value={viewMode}
+          />
 
-            {viewMode === "all" && teamMembers.length > 1 && (
-              <IconSelect
-                className="h-8 w-[140px]"
-                displayValue={
-                  userFilter === "all"
-                    ? "Everyone"
-                    : ((
-                        teamMembers as Array<{ id: string; name: string }>
-                      ).find((m) => m.id === userFilter)?.name ?? "Select…")
-                }
-                icon={UserIcon}
-                onValueChange={setUserFilter}
-                value={userFilter}
-              >
-                <SelectItem value="all">Everyone</SelectItem>
-                {(
-                  teamMembers as Array<{
-                    id: string;
-                    name: string;
-                    email: string;
-                  }>
-                ).map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name}
-                  </SelectItem>
-                ))}
-              </IconSelect>
-            )}
+          {viewMode === "all" && teamMembers.length > 1 && (
+            <IconSelect
+              className="h-8 w-[140px]"
+              displayValue={
+                userFilter === "all"
+                  ? "Everyone"
+                  : ((teamMembers as Array<{ id: string; name: string }>).find(
+                      (m) => m.id === userFilter
+                    )?.name ?? "Select…")
+              }
+              icon={UserIcon}
+              onValueChange={setUserFilter}
+              value={userFilter}
+            >
+              <SelectItem value="all">Everyone</SelectItem>
+              {(
+                teamMembers as Array<{
+                  id: string;
+                  name: string;
+                  email: string;
+                }>
+              ).map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.name}
+                </SelectItem>
+              ))}
+            </IconSelect>
+          )}
 
-            <Button onClick={() => setShowAddTask(!showAddTask)} size="sm">
-              <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-              Add Task
-            </Button>
-          </div>
+          <Button onClick={() => setShowAddTask(!showAddTask)} size="sm">
+            <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+            Add Task
+          </Button>
         </div>
       </PageHeader>
 

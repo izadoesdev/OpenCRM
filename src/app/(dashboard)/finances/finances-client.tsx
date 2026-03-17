@@ -76,32 +76,30 @@ export function FinancesClient() {
   return (
     <div className="flex h-full flex-col">
       <PageHeader>
-        <div className="flex flex-1 items-center justify-between gap-4">
-          <h1 className="font-semibold text-lg tracking-tight">Finances</h1>
-          <div className="flex items-center gap-5">
-            <Stat
-              accent="text-emerald-600"
-              label="Cash"
-              value={fmt(data.snapshot.cashOnHandCents)}
-            />
-            <Stat
-              accent="text-blue-600"
-              label="MRR"
-              sub={`ARR ${fmt(data.arrCents)}`}
-              value={fmt(data.totalMrrCents)}
-            />
-            <Stat
-              accent="text-red-600"
-              label="Burn"
-              sub="/mo"
-              value={fmt(data.monthlyExpenseCents)}
-            />
-            <Stat accent="text-amber-600" label="Runway" value={runwayLabel} />
-            <Button onClick={openAdd} size="sm">
-              <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-              Add
-            </Button>
-          </div>
+        <h1 className="font-semibold text-lg tracking-tight">Finances</h1>
+        <div className="flex items-center gap-5">
+          <Stat
+            accent="text-emerald-600"
+            label="Cash"
+            value={fmt(data.snapshot.cashOnHandCents)}
+          />
+          <Stat
+            accent="text-blue-600"
+            label="MRR"
+            sub={`ARR ${fmt(data.arrCents)}`}
+            value={fmt(data.totalMrrCents)}
+          />
+          <Stat
+            accent="text-red-600"
+            label="Burn"
+            sub="/mo"
+            value={fmt(data.monthlyExpenseCents)}
+          />
+          <Stat accent="text-amber-600" label="Runway" value={runwayLabel} />
+          <Button onClick={openAdd} size="sm">
+            <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+            Add
+          </Button>
         </div>
       </PageHeader>
 

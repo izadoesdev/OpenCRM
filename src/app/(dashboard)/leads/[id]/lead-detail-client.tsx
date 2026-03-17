@@ -129,78 +129,65 @@ export function LeadDetailClient({ leadId }: { leadId: string }) {
     <div className="flex h-full flex-col">
       {/* ── Header ── */}
       <PageHeader>
-        <div className="flex flex-1 items-center justify-between">
-          <Button render={<Link href="/leads" />} size="sm" variant="ghost">
-            <HugeiconsIcon icon={ArrowLeft02Icon} size={14} strokeWidth={2} />
-            Leads
+        <Button render={<Link href="/leads" />} size="sm" variant="ghost">
+          <HugeiconsIcon icon={ArrowLeft02Icon} size={14} strokeWidth={2} />
+          Leads
+        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setShowEmail(true)}
+            size="sm"
+            variant="outline"
+          >
+            <HugeiconsIcon icon={Mail01Icon} size={14} strokeWidth={1.5} />
+            Email
           </Button>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setShowEmail(true)}
-              size="sm"
-              variant="outline"
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button size="sm" />}>
+              Move to...
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {nextStatuses.map((s) => (
+                <DropdownMenuItem key={s} onClick={() => handleStatusChange(s)}>
+                  <StatusDot status={s} />
+                  {STATUS_LABELS[s]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button size="icon-sm" variant="ghost" />}
             >
-              <HugeiconsIcon icon={Mail01Icon} size={14} strokeWidth={1.5} />
-              Email
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button size="sm" />}>
-                Move to...
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {nextStatuses.map((s) => (
-                  <DropdownMenuItem
-                    key={s}
-                    onClick={() => handleStatusChange(s)}
-                  >
-                    <StatusDot status={s} />
-                    {STATUS_LABELS[s]}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<Button size="icon-sm" variant="ghost" />}
+              <HugeiconsIcon
+                icon={MoreHorizontalIcon}
+                size={14}
+                strokeWidth={1.5}
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setShowEdit(true)}>
+                <HugeiconsIcon icon={Edit02Icon} size={14} strokeWidth={1.5} />
+                Edit Lead
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowLogActivity(true)}>
+                <HugeiconsIcon icon={Task01Icon} size={14} strokeWidth={1.5} />
+                Log Activity
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setShowArchiveConfirm(true)}
+                variant="destructive"
               >
                 <HugeiconsIcon
-                  icon={MoreHorizontalIcon}
+                  icon={Delete02Icon}
                   size={14}
                   strokeWidth={1.5}
                 />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setShowEdit(true)}>
-                  <HugeiconsIcon
-                    icon={Edit02Icon}
-                    size={14}
-                    strokeWidth={1.5}
-                  />
-                  Edit Lead
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowLogActivity(true)}>
-                  <HugeiconsIcon
-                    icon={Task01Icon}
-                    size={14}
-                    strokeWidth={1.5}
-                  />
-                  Log Activity
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setShowArchiveConfirm(true)}
-                  variant="destructive"
-                >
-                  <HugeiconsIcon
-                    icon={Delete02Icon}
-                    size={14}
-                    strokeWidth={1.5}
-                  />
-                  Archive Lead
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                Archive Lead
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </PageHeader>
 

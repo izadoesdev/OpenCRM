@@ -289,22 +289,16 @@ export function AgentsClient() {
   return (
     <div className="flex h-full flex-col">
       <PageHeader>
-        <div className="flex flex-1 items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="font-semibold text-lg tracking-tight">AI Agent</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {messages.length > 0 && (
-              <button
-                className="font-mono text-[11px] text-muted-foreground tabular-nums hover:text-foreground"
-                onClick={() => setMessages([])}
-                type="button"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </div>
+        <h1 className="font-semibold text-lg tracking-tight">AI Agent</h1>
+        {messages.length > 0 && (
+          <button
+            className="font-mono text-[11px] text-muted-foreground tabular-nums hover:text-foreground"
+            onClick={() => setMessages([])}
+            type="button"
+          >
+            Clear
+          </button>
+        )}
       </PageHeader>
 
       <div className="flex flex-1 overflow-hidden">

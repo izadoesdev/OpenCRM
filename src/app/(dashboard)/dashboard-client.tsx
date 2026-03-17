@@ -95,46 +95,40 @@ export function DashboardClient() {
   return (
     <div className="flex h-full flex-col">
       <PageHeader>
-        <div className="flex flex-1 items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="font-semibold text-lg tracking-tight">Dashboard</h1>
-            <SegmentedControl
-              onChange={setDateRange}
-              segments={[
-                { value: "all" as const, label: "All" },
-                { value: "week" as const, label: "7d" },
-                { value: "month" as const, label: "30d" },
-                { value: "quarter" as const, label: "90d" },
-              ]}
-              value={dateRange}
-            />
-          </div>
-          <div className="flex items-center gap-5">
-            <Stat
-              accent="text-blue-600"
-              label="Leads"
-              value={stats.totalLeads}
-            />
-            <Stat
-              accent="text-amber-600"
-              label="Qualified"
-              value={stats.qualified}
-            />
-            <Stat
-              accent="text-emerald-600"
-              label="Conv"
-              value={stats.conversionRate}
-            />
-            <Stat
-              accent="text-violet-600"
-              label="Revenue"
-              value={fmtCents(stats.revenue)}
-            />
-            <Button onClick={() => setShowForm(true)} size="sm">
-              <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-              Add Lead
-            </Button>
-          </div>
+        <div className="flex items-center gap-3">
+          <h1 className="font-semibold text-lg tracking-tight">Dashboard</h1>
+          <SegmentedControl
+            onChange={setDateRange}
+            segments={[
+              { value: "all" as const, label: "All" },
+              { value: "week" as const, label: "7d" },
+              { value: "month" as const, label: "30d" },
+              { value: "quarter" as const, label: "90d" },
+            ]}
+            value={dateRange}
+          />
+        </div>
+        <div className="flex items-center gap-5">
+          <Stat accent="text-blue-600" label="Leads" value={stats.totalLeads} />
+          <Stat
+            accent="text-amber-600"
+            label="Qualified"
+            value={stats.qualified}
+          />
+          <Stat
+            accent="text-emerald-600"
+            label="Conv"
+            value={stats.conversionRate}
+          />
+          <Stat
+            accent="text-violet-600"
+            label="Revenue"
+            value={fmtCents(stats.revenue)}
+          />
+          <Button onClick={() => setShowForm(true)} size="sm">
+            <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+            Add Lead
+          </Button>
         </div>
       </PageHeader>
 

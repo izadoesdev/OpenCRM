@@ -105,29 +105,19 @@ export function ReportingClient() {
   return (
     <div className="flex h-full flex-col">
       <PageHeader>
-        <div className="flex flex-1 items-center justify-between gap-4">
-          <h1 className="font-semibold text-lg tracking-tight">Reporting</h1>
-          <div className="flex items-center gap-5">
-            <Stat accent="text-blue-600" label="Leads" value={totalLeads} />
+        <h1 className="font-semibold text-lg tracking-tight">Reporting</h1>
+        <div className="flex items-center gap-5">
+          <Stat accent="text-blue-600" label="Leads" value={totalLeads} />
+          <Stat accent="text-emerald-600" label="Conv" value={`${convRate}%`} />
+          <Stat accent="text-amber-600" label="Pipeline" value={activeStages} />
+          <Stat accent="text-red-600" label="Lost" value={`${lossRate}%`} />
+          {avgVelocity && (
             <Stat
-              accent="text-emerald-600"
-              label="Conv"
-              value={`${convRate}%`}
+              accent="text-violet-600"
+              label="Cycle"
+              value={`${avgVelocity}d`}
             />
-            <Stat
-              accent="text-amber-600"
-              label="Pipeline"
-              value={activeStages}
-            />
-            <Stat accent="text-red-600" label="Lost" value={`${lossRate}%`} />
-            {avgVelocity && (
-              <Stat
-                accent="text-violet-600"
-                label="Cycle"
-                value={`${avgVelocity}d`}
-              />
-            )}
-          </div>
+          )}
         </div>
       </PageHeader>
 
